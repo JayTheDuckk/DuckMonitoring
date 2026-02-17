@@ -1,0 +1,113 @@
+.speedometer-container {
+  width: 100%;
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+}
+
+.speedometer-header {
+  margin-bottom: 1.5rem;
+}
+
+.speedometer-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+}
+
+.speedometer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+}
+
+.speedometer-gauge {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.speedometer-gauge:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--accent-color);
+  transform: translateY(-2px);
+}
+
+.gauge-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.gauge-wrapper {
+  width: 100%;
+  max-width: 250px;
+  height: 150px;
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.gauge-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.gauge-arc {
+  transition: stroke-dasharray 0.5s ease;
+}
+
+.gauge-needle {
+  transition: transform 0.5s ease;
+}
+
+.gauge-tick-label {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+}
+
+.gauge-value {
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--accent-color);
+  transition: color 0.3s ease;
+}
+
+.speedometer-loading,
+.speedometer-error,
+.speedometer-empty {
+  padding: 2rem;
+  text-align: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  color: var(--text-secondary);
+}
+
+.speedometer-error {
+  color: var(--error);
+}
+
+.speedometer-empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .speedometer-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .gauge-wrapper {
+    max-width: 100%;
+  }
+}
+
+

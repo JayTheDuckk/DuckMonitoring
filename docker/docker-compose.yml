@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  # Web Server 1
+  web-server-1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    container_name: nagios-web-server-1
+    environment:
+      - SERVER_URL=http://host.docker.internal:8000
+      - HOSTNAME=web-server-1
+      - AGENT_ID=web-server-1-agent
+      - INTERVAL=30
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - monitoring-network
+
+  # Web Server 2
+  web-server-2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    container_name: nagios-web-server-2
+    environment:
+      - SERVER_URL=http://host.docker.internal:8000
+      - HOSTNAME=web-server-2
+      - AGENT_ID=web-server-2-agent
+      - INTERVAL=30
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - monitoring-network
+
+  # Database Server
+  db-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    container_name: nagios-db-server
+    environment:
+      - SERVER_URL=http://host.docker.internal:8000
+      - HOSTNAME=db-server
+      - AGENT_ID=db-server-agent
+      - INTERVAL=30
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - monitoring-network
+
+  # Cache Server
+  cache-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    container_name: nagios-cache-server
+    environment:
+      - SERVER_URL=http://host.docker.internal:8000
+      - HOSTNAME=cache-server
+      - AGENT_ID=cache-server-agent
+      - INTERVAL=30
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - monitoring-network
+
+  # App Server 1
+  app-server-1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    container_name: nagios-app-server-1
+    environment:
+      - SERVER_URL=http://host.docker.internal:8000
+      - HOSTNAME=app-server-1
+      - AGENT_ID=app-server-1-agent
+      - INTERVAL=30
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - monitoring-network
+
+  # App Server 2
+  app-server-2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    container_name: nagios-app-server-2
+    environment:
+      - SERVER_URL=http://host.docker.internal:8000
+      - HOSTNAME=app-server-2
+      - AGENT_ID=app-server-2-agent
+      - INTERVAL=30
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - monitoring-network
+
+networks:
+  monitoring-network:
+    driver: bridge

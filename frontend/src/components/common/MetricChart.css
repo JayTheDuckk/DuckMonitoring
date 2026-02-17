@@ -1,0 +1,21 @@
+.metric-chart {
+  width: 100%;
+}
+
+.chart-wrapper {
+  position: relative;
+  height: 400px;
+  width: 100%;
+}
+
+.chart-loading,
+.chart-error {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+}
+
+.chart-error {
+  color: var(--error);
+}
+

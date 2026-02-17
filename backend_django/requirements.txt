@@ -1,0 +1,14 @@
+django>=5.0
+djangorestframework
+djangorestframework-simplejwt
+django-cors-headers
+psycopg2-binary
+celery
+redis
+python-dotenv
+gunicorn
+dj-database-url
+django-filter
+ping3>=4.0.4
+pysnmp>=4.4.12
+requests
