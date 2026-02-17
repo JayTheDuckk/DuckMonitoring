@@ -15,6 +15,17 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = (permissions.AllowAny,)
     serializer_class = RegisterSerializer
 
+class SetupStatusView(APIView):
+    """
+    Public endpoint to check if the system is initialized (has admin).
+    """
+    permission_classes = (permissions.AllowAny,)
+    
+    def get(self, request):
+        # Check if any admin user exists
+        is_setup = User.objects.filter(role='admin').exists()
+        return Response({'is_setup': is_setup})
+
 class UserProfileView(generics.RetrieveUpdateAPIView):
     """
     Endpoint for the current logged-in user to view or update their profile.

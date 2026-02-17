@@ -2,7 +2,10 @@ from celery import shared_task
 from django.utils import timezone
 from .models import ServiceCheckConfig, ServiceCheckResult, Check, Metric, UPSMetric, SNMPDeviceMetric
 from inventory.models import Host, UPSDevice, SNMPDevice
-from core.utils.service_checker import run_service_check, check_ups, check_snmp_device
+from core.utils.service_checker import (
+    run_service_check, check_ups, check_snmp_device,
+    check_ssl_expiry, check_dns, check_http_content
+)
 import json
 
 @shared_task

@@ -15,6 +15,7 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isSetup, setIsSetup] = useState(true); // Default to true to prevent redirect flash
   const [token, setToken] = useState(localStorage.getItem('access_token'));
   const skipAuthCheckRef = useRef(false);
 
@@ -28,6 +29,23 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('access_token');
     }
   }, [token]);
+
+  // Check setup status
+  const checkSetup = async () => {
+    try {
+      const { getSetupStatus } = require('../services/api');
+      const response = await getSetupStatus();
+      setIsSetup(response.data.is_setup);
+      return response.data.is_setup;
+    } catch (error) {
+      console.error('Failed to check setup status:', error);
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    checkSetup();
+  }, []);
 
   // Check if user is authenticated on mount
   useEffect(() => {
@@ -135,10 +153,13 @@ export const AuthProvider = ({ children }) => {
     user,
     token,
     loading,
+    isSetup,
+    checkSetup,
     login,
     register,
     logout,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
+    isAdmin: user?.is_admin || user?.role === 'admin'
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

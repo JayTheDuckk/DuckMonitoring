@@ -78,11 +78,12 @@ api.interceptors.response.use(
 export const login = (credentials) => api.post('/auth/token/', credentials);
 export const register = (userData) => api.post('/auth/register/', userData);
 export const getProfile = () => api.get('/auth/me/');
+export const getSetupStatus = () => api.get('/auth/setup-status/');
 
 // --- User Management (Admin) ---
 export const getUsers = () => api.get('/auth/users/');
 export const getUser = (userId) => api.get(`/auth/users/${userId}/`);
-export const updateUser = (userId, userData) => api.put(`/auth/users/${userId}/`, userData);
+export const updateUser = (userId, userData) => api.patch(`/auth/users/${userId}/`, userData);
 export const deleteUser = (userId) => api.delete(`/auth/users/${userId}/`);
 
 // --- Inventory (Hosts) ---
