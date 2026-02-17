@@ -14,6 +14,8 @@ import SNMPDetail from './components/devices/SNMPDetail';
 import AuditLogs from './components/settings/AuditLogs';
 import SecuritySettings from './components/settings/SecuritySettings';
 import AlertsDashboard from './components/dashboards/AlertsDashboard';
+import ChannelForm from './components/dashboards/ChannelForm';
+import RuleForm from './components/dashboards/RuleForm';
 import CustomDashboard from './components/dashboards/CustomDashboard';
 import HostDiscovery from './components/hosts/HostDiscovery';
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -267,6 +269,38 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <AlertsDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/alerts/channels/new"
+                  element={
+                    <ProtectedRoute>
+                      <ChannelForm />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/alerts/channels/:channelId"
+                  element={
+                    <ProtectedRoute>
+                      <ChannelForm />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/alerts/rules/new"
+                  element={
+                    <ProtectedRoute>
+                      <RuleForm />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/alerts/rules/:ruleId"
+                  element={
+                    <ProtectedRoute>
+                      <RuleForm />
                     </ProtectedRoute>
                   }
                 />
