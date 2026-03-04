@@ -10,16 +10,15 @@
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.2.0",
     "react-force-graph-2d": "^1.29.1",
-    "react-router-dom": "^6.20.0"
+    "react-router-dom": "^6.20.0",
+    "react-scripts": "5.0.1",
+    "yaml": "^2.8.2"
   },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
-  },
-  "devDependencies": {
-    "react-scripts": "5.0.1"
   },
   "browserslist": {
     "production": [
