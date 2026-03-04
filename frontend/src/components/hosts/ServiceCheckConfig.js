@@ -71,7 +71,9 @@ const ServiceCheckConfig = ({ hostId, hostname, ipAddress }) => {
       https: { port: 443, path: '/', expected_status: 200 },
       tcp: { port: 80 },
       udp: { port: 53 },
-      dns: {},
+      dns: { server: '8.8.8.8', record_type: 'A' },
+      ssl_expiry: { port: 443 },
+      http_content: { port: 80, path: '/', content: '', use_https: false },
       snmp: { community: 'public', snmp_version: 2, port: 161, oid: '1.3.6.1.2.1.1.1.0' },
       ilo: { community: 'public', snmp_version: 2, port: 161, check_type: 'health' },
       idrac: { community: 'public', snmp_version: 2, port: 161, check_type: 'health' }
@@ -373,6 +375,92 @@ const ServiceCheckConfig = ({ hostId, hostname, ipAddress }) => {
                 </>
               )}
 
+              {formData.check_type === 'http_content' && (
+                <>
+                  <div className="form-group">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={formData.parameters.use_https || false}
+                        onChange={(e) => handleParameterChange('use_https', e.target.checked)}
+                      />
+                      Use HTTPS
+                    </label>
+                  </div>
+                  <div className="form-group">
+                    <label>Port</label>
+                    <input
+                      type="number"
+                      value={formData.parameters.port || (formData.parameters.use_https ? 443 : 80)}
+                      onChange={(e) => handleParameterChange('port', parseInt(e.target.value) || 80)}
+                      min="1"
+                      max="65535"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Path</label>
+                    <input
+                      type="text"
+                      value={formData.parameters.path || '/'}
+                      onChange={(e) => handleParameterChange('path', e.target.value)}
+                      placeholder="/"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Content to Match *</label>
+                    <input
+                      type="text"
+                      value={formData.parameters.content || ''}
+                      onChange={(e) => handleParameterChange('content', e.target.value)}
+                      placeholder="e.g. Welcome to Dashboard"
+                      required
+                    />
+                    <small>Check will FAIL if this text is not found in the response body.</small>
+                  </div>
+                </>
+              )}
+
+              {formData.check_type === 'ssl_expiry' && (
+                <div className="form-group">
+                  <label>Port</label>
+                  <input
+                    type="number"
+                    value={formData.parameters.port || 443}
+                    onChange={(e) => handleParameterChange('port', parseInt(e.target.value) || 443)}
+                    min="1"
+                    max="65535"
+                  />
+                </div>
+              )}
+
+              {formData.check_type === 'dns' && (
+                <>
+                  <div className="form-group">
+                    <label>DNS Server</label>
+                    <input
+                      type="text"
+                      value={formData.parameters.server || '8.8.8.8'}
+                      onChange={(e) => handleParameterChange('server', e.target.value)}
+                      placeholder="8.8.8.8"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Record Type</label>
+                    <select
+                      value={formData.parameters.record_type || 'A'}
+                      onChange={(e) => handleParameterChange('record_type', e.target.value)}
+                    >
+                      <option value="A">A (IPv4)</option>
+                      <option value="AAAA">AAAA (IPv6)</option>
+                      <option value="CNAME">CNAME</option>
+                      <option value="MX">MX</option>
+                      <option value="TXT">TXT</option>
+                      <option value="NS">NS</option>
+                    </select>
+                  </div>
+                </>
+              )}
+
               {(formData.check_type === 'tcp' || formData.check_type === 'udp') && (
                 <div className="form-group">
                   <label>Port *</label>
@@ -573,8 +661,9 @@ const ServiceCheckConfig = ({ hostId, hostname, ipAddress }) => {
             </form>
           </div>
         </div>
-      )}
-    </div>
+      )
+      }
+    </div >
   );
 };
 

@@ -2,7 +2,10 @@ from celery import shared_task
 from django.utils import timezone
 from .models import ServiceCheckConfig, ServiceCheckResult, Check, Metric, UPSMetric, SNMPDeviceMetric
 from inventory.models import Host, UPSDevice, SNMPDevice
-from core.utils.service_checker import run_service_check, check_ups, check_snmp_device
+from core.utils.service_checker import (
+    run_service_check, check_ups, check_snmp_device,
+    check_ssl_expiry, check_dns, check_http_content
+)
 import json
 
 @shared_task
@@ -47,7 +50,7 @@ def check_service(config_id):
         config.save()
         
         # Store result
-        ServiceCheckResult.objects.create(
+        result_obj = ServiceCheckResult.objects.create(
             host=config.host,
             service_check=config,
             check_type=config.check_type,
@@ -56,6 +59,13 @@ def check_service(config_id):
             output=output,
             response_time=response_time
         )
+        
+        # Evaluate Alerts
+        try:
+            from alerts.services import AlertService
+            AlertService.evaluate_alerts(config.host, result_obj)
+        except Exception as e:
+            print(f"Alert evaluation failed: {e}")
         
         # Update Check model for summary
         Check.objects.update_or_create(

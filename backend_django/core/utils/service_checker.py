@@ -383,6 +383,16 @@ def run_service_check(check_config: Dict) -> Tuple[str, str, Optional[float]]:
         return check_http(host, port=parameters.get('port', 443), path=parameters.get('path', '/'), timeout=timeout, expected_status=parameters.get('expected_status', 200), use_https=True)
     elif check_type == 'tcp':
         return check_tcp_port(host, port=parameters.get('port'), timeout=timeout)
+    elif check_type == 'ssl_expiry':
+        return check_ssl_expiry(host, port=parameters.get('port', 443), timeout=timeout)
+    elif check_type == 'dns':
+        return check_dns(host, server=parameters.get('server', '8.8.8.8'), record_type=parameters.get('record_type', 'A'), timeout=timeout)
+    elif check_type == 'http_content':
+        path = parameters.get('path', '/')
+        port = parameters.get('port', 80)
+        protocol = 'https' if parameters.get('use_https') else 'http'
+        url = f'{protocol}://{host}:{port}{path}'
+        return check_http_content(url, content=parameters.get('content', ''), timeout=timeout)
     
     return ('unknown', f'Check type {check_type} not supported', None)
 
@@ -517,3 +527,93 @@ def scan_host_ports(host: str, ports: List[int] = None, timeout: float = 1.0) ->
             pass
             
     return results
+
+def check_ssl_expiry(host: str, port: int = 443, timeout: int = 10) -> Tuple[str, str, float]:
+    """
+    Check SSL certificate expiration date.
+    Returns: (status, output, days_until_expiry)
+    """
+    import ssl
+    import socket
+    import datetime
+    
+    try:
+        start_time = time.time()
+        context = ssl.create_default_context()
+        context.check_hostname = False # Loose check
+        
+        with socket.create_connection((host, port), timeout=timeout) as sock:
+            with context.wrap_socket(sock, server_hostname=host) as ssock:
+                cert = ssock.getpeercert()
+                
+                # Format: 'May 20 12:00:00 2026 GMT'
+                # But sometimes it varies. Let's be careful.
+                # Standard Python ssl module returns this format.
+                not_after = cert['notAfter']
+                expiry_date = datetime.datetime.strptime(not_after, r'%b %d %H:%M:%S %Y %Z')
+                
+                remaining = expiry_date - datetime.datetime.utcnow()
+                days = remaining.days
+                
+                response_time = (time.time() - start_time) * 1000
+                
+                if days < 7:
+                    return ('critical', f'SSL CRITICAL - Expiring in {days} days', response_time)
+                elif days < 30:
+                    return ('warning', f'SSL WARNING - Expiring in {days} days', response_time)
+                else:
+                    return ('ok', f'SSL OK - Expires in {days} days ({expiry_date.date()})', response_time)
+
+    except ssl.SSLError as e:
+        return ('critical', f'SSL CRITICAL - Certificate Error: {e}', 0)
+    except Exception as e:
+        return ('critical', f'SSL CHECK FAILED - {str(e)}', 0)
+
+def check_dns(host: str, server: str = '8.8.8.8', record_type: str = 'A', timeout: int = 5) -> Tuple[str, str, float]:
+    """
+    Check DNS resolution.
+    Returns: (status, output, response_time)
+    """
+    try:
+        import dns.resolver
+    except ImportError:
+        return ('unknown', 'DNS CHECK ERROR - dnspython not installed', 0)
+        
+    start_time = time.time()
+    try:
+        resolver = dns.resolver.Resolver()
+        resolver.nameservers = [server]
+        resolver.timeout = timeout
+        resolver.lifetime = timeout
+        
+        answers = resolver.resolve(host, record_type)
+        response_time = (time.time() - start_time) * 1000
+        
+        result_ips = [str(r) for r in answers]
+        return ('ok', f'DNS OK - {host} resolved to {", ".join(result_ips)}', response_time)
+        
+    except Exception as e:
+        return ('critical', f'DNS CRITICAL - Resolution failed: {str(e)}', 0)
+
+def check_http_content(url: str, content: str, timeout: int = 10) -> Tuple[str, str, float]:
+    """
+    Check if URL returns 200 OK AND contains specific content.
+    """
+    start_time = time.time()
+    try:
+        if not url.startswith('http'):
+            url = f'http://{url}'
+            
+        response = requests.get(url, timeout=timeout, verify=False)
+        response_time = (time.time() - start_time) * 1000
+        
+        if response.status_code >= 400:
+             return ('critical', f'HTTP CRITICAL - Status {response.status_code}', response_time)
+             
+        if content in response.text:
+            return ('ok', f'HTTP CONTENT OK - Found "{content}"', response_time)
+        else:
+            return ('critical', f'HTTP CONTENT CRITICAL - String "{content}" not found', response_time)
+            
+    except Exception as e:
+        return ('critical', f'HTTP CHECK FAILED - {str(e)}', 0)

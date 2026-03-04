@@ -146,7 +146,6 @@ const Login = () => {
                 onChange={(e) => setUsername(e.target.value)}
                 required
                 autoFocus
-                placeholder="Enter your username"
               />
             </div>
 
@@ -158,7 +157,6 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                placeholder="Enter your password"
               />
             </div>
 
@@ -206,9 +204,6 @@ const Login = () => {
           <div className="login-footer">
             <p>
               Don't have an account? <Link to="/register">Register here</Link>
-            </p>
-            <p className="demo-credentials">
-              Demo: admin / admin
             </p>
           </div>
         )}

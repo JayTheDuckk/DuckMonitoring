@@ -6,6 +6,7 @@ import ConciseDashboard from './components/dashboards/ConciseDashboard';
 import HostDetail from './components/hosts/HostDetail';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
+import Setup from './components/auth/Setup';
 import UserManagement from './components/settings/UserManagement';
 import UPSDashboard from './components/devices/UPSDashboard';
 import UPSDetail from './components/devices/UPSDetail';
@@ -14,6 +15,8 @@ import SNMPDetail from './components/devices/SNMPDetail';
 import AuditLogs from './components/settings/AuditLogs';
 import SecuritySettings from './components/settings/SecuritySettings';
 import AlertsDashboard from './components/dashboards/AlertsDashboard';
+import ChannelForm from './components/dashboards/ChannelForm';
+import RuleForm from './components/dashboards/RuleForm';
 import CustomDashboard from './components/dashboards/CustomDashboard';
 import HostDiscovery from './components/hosts/HostDiscovery';
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -160,149 +163,220 @@ const Navbar = () => {
 
 import { ToastProvider } from './contexts/ToastContext';
 
-// ... existing code ...
+const AppContent = () => {
+  const { loading, isSetup } = useAuth();
+
+  if (loading) {
+    return <div className="loading-screen">Loading...</div>;
+  }
+
+  return (
+    <div className="app-container">
+      <Navbar />
+      <main className="main-content">
+        <Routes>
+          {/* Public Routes */}
+          <Route
+            path="/login"
+            element={!isSetup ? <Navigate to="/setup" replace /> : <Login />}
+          />
+          <Route path="/register" element={<Register />} />
+          <Route
+            path="/setup"
+            element={isSetup ? <Navigate to="/login" replace /> : <Setup />}
+          />
+
+          {/* Protected Routes */}
+          <Route
+            path="/"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/overview"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <ConciseDashboard />
+                </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/host/:hostId"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <HostDetail />
+                </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/users"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <UserManagement />
+                </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ups"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <UPSDashboard />
+                </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ups/:deviceId"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <UPSDetail />
+                </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/snmp"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <SNMPDashboard />
+                </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/snmp/:deviceId"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <SNMPDetail />
+                </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/audit-logs"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <AuditLogs />
+                </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/discovery"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <HostDiscovery />
+                </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/security"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <SecuritySettings />
+                </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/alerts"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <AlertsDashboard />
+                </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/alerts/channels/new"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <ChannelForm />
+                </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/alerts/channels/:channelId"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <ChannelForm />
+                </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/alerts/rules/new"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <RuleForm />
+                </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/alerts/rules/:ruleId"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <RuleForm />
+                </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboards"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <CustomDashboard />
+                </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboards/:dashboardId"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <CustomDashboard />
+                </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/topology"
+            element={
+              !isSetup ? <Navigate to="/setup" replace /> :
+                <ProtectedRoute>
+                  <TopologyGraph />
+                </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+    </div>
+  );
+};
 
 function App() {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <Router>
-          <div className="App">
-            <Navbar />
-            <main className="main-content">
-              <Routes>
-                {/* ... routes ... */}
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route
-                  path="/"
-                  element={
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/overview"
-                  element={
-                    <ProtectedRoute>
-                      <ConciseDashboard />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/host/:hostId"
-                  element={
-                    <ProtectedRoute>
-                      <HostDetail />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/users"
-                  element={
-                    <ProtectedRoute>
-                      <UserManagement />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/ups"
-                  element={
-                    <ProtectedRoute>
-                      <UPSDashboard />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/ups/:deviceId"
-                  element={
-                    <ProtectedRoute>
-                      <UPSDetail />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/snmp"
-                  element={
-                    <ProtectedRoute>
-                      <SNMPDashboard />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/snmp/:deviceId"
-                  element={
-                    <ProtectedRoute>
-                      <SNMPDetail />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/audit-logs"
-                  element={
-                    <ProtectedRoute>
-                      <AuditLogs />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/discovery"
-                  element={
-                    <ProtectedRoute>
-                      <HostDiscovery />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/security"
-                  element={
-                    <ProtectedRoute>
-                      <SecuritySettings />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/alerts"
-                  element={
-                    <ProtectedRoute>
-                      <AlertsDashboard />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/dashboards"
-                  element={
-                    <ProtectedRoute>
-                      <CustomDashboard />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/dashboards/:dashboardId"
-                  element={
-                    <ProtectedRoute>
-                      <CustomDashboard />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/topology"
-                  element={
-                    <ProtectedRoute>
-                      <TopologyGraph />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </main>
-          </div>
-        </Router>
-      </ToastProvider>
-    </AuthProvider>
+    <Router>
+      <AuthProvider>
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 
 export default App;
+
 
