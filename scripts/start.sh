@@ -66,7 +66,7 @@ else
     fi
     
     # Start frontend
-    BROWSER=none nohup npm start > /tmp/duck-monitoring-frontend.log 2>&1 &
+    HOST=0.0.0.0 BROWSER=none nohup npm start > /tmp/duck-monitoring-frontend.log 2>&1 &
     FRONTEND_PID=$!
     echo $FRONTEND_PID > /tmp/duck-monitoring-frontend.pid
     echo -e "${GREEN}Frontend started (PID: $FRONTEND_PID)${NC}"
