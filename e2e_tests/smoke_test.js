@@ -13,8 +13,12 @@ const puppeteer = require('puppeteer');
         console.log("Navigating to http://localhost:3000");
         await page.goto('http://localhost:3000', { waitUntil: 'networkidle2' });
 
-        // Wait for setup or login to render
-        await new Promise(r => setTimeout(r, 1000));
+        // Wait for setup or login to render dynamically
+        try {
+            await page.waitForSelector('#confirmPassword, #username', { timeout: 10000 });
+        } catch (e) {
+            console.log("Timeout waiting for form elements, proceeding anyway to check what rendered...");
+        }
 
         const isSetupPage = await page.$('#confirmPassword') !== null;
 
@@ -30,9 +34,7 @@ const puppeteer = require('puppeteer');
 
             console.log("Submitting Setup Form...");
             await page.click('button[type="submit"]');
-
-            // Wait for redirect to /login
-            await page.waitForNavigation({ waitUntil: 'networkidle0' });
+            await page.waitForSelector('#username', { timeout: 15000 }); // Wait for redirect to /login
             console.log("Navigated after setup.");
         }
 
@@ -50,9 +52,7 @@ const puppeteer = require('puppeteer');
 
             console.log("Submitting Login Form...");
             await page.click('button[type="submit"]');
-
-            // Wait for redirect to dashboard
-            await page.waitForNavigation({ waitUntil: 'networkidle0' });
+            await page.waitForSelector('.navbar', { timeout: 15000 }); // Wait for dashboard nav to load
             console.log("Logged in successfully. Navigated to Dashboard.");
         }
 
@@ -60,29 +60,27 @@ const puppeteer = require('puppeteer');
         console.log("Taking screenshot: 1_dashboard.png");
         await page.screenshot({ path: '1_dashboard.png', fullPage: true });
 
-        // Navigate to Hosts
-        console.log("Navigating to Hosts...");
-        // Look for the "Hosts" or "Inventory" link in the nav bar.
-        // Assuming there are anchor tags with text content or specific hrefs.
-        const hostsLinkCount = await page.evaluate(() => {
+        // Navigate to Overview
+        console.log("Navigating to Overview...");
+        const overviewLinkCount = await page.evaluate(() => {
             const links = Array.from(document.querySelectorAll('a'));
-            const hostsLink = links.find(el => el.textContent.includes('Hosts') || el.textContent.includes('Inventory'));
-            if (hostsLink) {
-                hostsLink.click();
+            const overviewLink = links.find(el => el.textContent.includes('Overview'));
+            if (overviewLink) {
+                overviewLink.click();
                 return 1;
             }
             return 0;
         });
 
-        if (hostsLinkCount > 0) {
+        if (overviewLinkCount > 0) {
             await new Promise(r => setTimeout(r, 2000)); // Give the table time to render
-            console.log("Taking screenshot: 2_hosts.png");
-            await page.screenshot({ path: '2_hosts.png', fullPage: true });
+            console.log("Taking screenshot: 2_overview.png");
+            await page.screenshot({ path: '2_overview.png', fullPage: true });
         } else {
-            console.log("Could not find Hosts navigation link, attempting direct navigation.");
-            await page.goto('http://localhost:3000/hosts', { waitUntil: 'networkidle2' });
+            console.log("Could not find Overview navigation link, attempting direct navigation.");
+            await page.goto('http://localhost:3000/overview', { waitUntil: 'networkidle2' });
             await new Promise(r => setTimeout(r, 2000));
-            await page.screenshot({ path: '2_hosts.png', fullPage: true });
+            await page.screenshot({ path: '2_overview.png', fullPage: true });
         }
 
         // Navigate to Alerts
