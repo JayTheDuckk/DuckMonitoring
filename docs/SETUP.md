@@ -8,51 +8,29 @@
 
 ## Initial Setup
 
-**First-time setup (creates admin user and configures server):**
+The easiest way to perform a new installation or factory reset of Duck Monitoring is to use the provided initial startup script. It handles creating virtual environments, installing dependencies, and running fresh migrations automatically.
 
-1. Navigate to the backend directory:
-```bash
-cd backend_django
-```
+1. **Start the Initial Setup:**
+   From the project root, run the setup script:
+   ```bash
+   ./scripts/initial_startup.sh
+   ```
 
-2. Create a virtual environment (recommended):
-```bash
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+   **Warning:** This script will prompt you for confirmation because it deletes the existing SQLite database (if any) to ensure a clean boot.
 
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+   The script will perform the following actions automatically:
+   - Create a Python virtual environment in `backend_django/venv`
+   - Install backend dependencies from `requirements.txt`
+   - Run initial database migrations (`db.sqlite3` is used by default)
+   - Install frontend Node dependencies
+   - Start the backend API on port `8000`
+   - Start the frontend web application on port `3000`
 
-4. Run the initial setup script:
-```bash
-python manage.py migrate
-python reset_admin.py
-```
-
-The setup script will guide you through:
-- Creating an admin user account (username, email, password)
-- Setting the server IP address (auto-detects local IP)
-- Optionally setting a server hostname
-
-## Backend Setup
-
-After initial setup, start the backend server:
-
-1. Navigate to the backend directory:
-```bash
-cd backend_django
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-2. Run the backend server:
-```bash
-python manage.py runserver
-```
-
-The API will be available at `http://localhost:8000` (or your configured IP)
+2. **Register First User via Browser:**
+   Once the servers are running:
+   - Open your web browser and navigate to `http://localhost:3000`
+   - You will be automatically redirected to the **Initial Setup** page.
+   - Fill out the form to create your first administrative user account.
 
 ## Database Configuration (Optional)
 
@@ -60,25 +38,6 @@ The API will be available at `http://localhost:8000` (or your configured IP)
 - For PostgreSQL: 
   - Ensure PostgreSQL driver is installed (included in `requirements.txt`)
   - Edit `config/settings.py` or set environment variable: `DATABASE_URL=postgresql://user:password@localhost/duck_monitoring`
-
-## Frontend Setup
-
-1. Navigate to the frontend directory:
-```bash
-cd frontend
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Start the development server:
-```bash
-npm start
-```
-
-The frontend will be available at `http://localhost:3000`
 
 ## Agent Setup
 

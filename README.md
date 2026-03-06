@@ -68,54 +68,40 @@ This will start 6 test hosts (web servers, database, cache, app servers) that au
 
 ## Getting Started
 
+## Getting Started
+
+## Getting Started
+
 ### Initial Setup
 
-**First-time setup (creates admin user and configures server):**
-```bash
-cd backend_django
-python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-python manage.py migrate
-python reset_admin.py
-```
+Duck Monitoring handles its own bootstrapping automatically using the provided initial setup script. You do not need to manually create virtual environments or install dependencies.
 
-This will prompt you to:
-- Create an admin user (username, email, password)
-- Set the server IP address
-- Optionally set a server hostname
+1. **Start Initial Setup:**
+   From the project root directory, run the setup script:
+   ```bash
+   ./scripts/initial_startup.sh
+   ```
+   
+   **Warning:** This script is intended for first-time installation and will ask you to confirm a database reset.
+   
+   The script will:
+   - Create a Python virtual environment
+   - Install backend requirements and run fresh database migrations
+   - Install frontend Node dependencies
+   - Start both the Django API (`http://localhost:8000`) and the React UI (`http://localhost:3000`)
 
-### Backend Setup
-
-After initial setup, start the backend server:
-
-```bash
-cd backend_django
-source venv/bin/activate  # Windows: venv\Scripts\activate
-python manage.py runserver
-```
-
-The API will be available at `http://localhost:8000` (or your configured IP)
-
-### Frontend Setup
-
-```bash
-cd frontend
-npm install
-npm start
-```
-
-The frontend will be available at `http://localhost:3000`
+2. **Register Admin User:**
+   Once the servers are running, open your web browser to `http://localhost:3000`. You will be directed to an **Initial Setup** page to create your first administrative user.
 
 ## Server Management
 
-Easy-to-use scripts for starting and stopping the servers:
+Easy-to-use scripts for subsequent starts and stops:
 
 ### Start Both Servers
 ```bash
 ./scripts/start.sh
 ```
-Starts both backend and frontend servers in the background.
+Starts both backend and frontend servers in the background (requires `initial_startup.sh` to have been run at least once).
 
 ### Stop Both Servers
 ```bash

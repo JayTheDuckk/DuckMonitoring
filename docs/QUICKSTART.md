@@ -2,54 +2,39 @@
 
 Get up and running with Duck Monitoring in minutes!
 
-## 1. Initial Setup (5 minutes)
+## 1. Start the Application (5 minutes)
+
+Duck Monitoring comes with a streamlined initial startup script that automatically creates the database, installs dependencies, and starts the frontend and backend servers.
 
 ```bash
-# Navigate to backend
-cd backend_django
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run initial setup (creates admin user and configures server)
-python manage.py migrate
-python reset_admin.py
+# From the project root, run the initial setup script
+./scripts/initial_startup.sh
 ```
 
-The setup script will guide you through:
-- Creating an admin user account
-- Setting the server IP address
-- Optionally setting a server hostname
+**Note:** This script is intended for first-time installation and will prompt you to confirm resetting the database.
 
-## 2. Start Backend Server (1 minute)
+The script will:
+- Create a Python virtual environment
+- Install backend dependencies
+- Run initial database migrations
+- Install frontend dependencies
+- Start the API on `http://localhost:8000`
+- Start the Web UI on `http://localhost:3000`
 
+## 2. Initial Browser Setup (1 minute)
+
+Once the script finishes starting the servers:
+1. Open your browser to `http://localhost:3000`
+2. You will be automatically redirected to the **Setup** page
+3. Create your first administrative user account
+
+## 3. Regular Restarts
+
+For regular use (after the initial setup), you can simply use the standard start and stop scripts:
 ```bash
-# Make sure you're in the backend directory with venv activated
-python manage.py runserver
+./scripts/start.sh
+./scripts/stop.sh
 ```
-
-The backend will start on `http://localhost:8000` (or your configured IP)
-
-## 3. Frontend Setup (3 minutes)
-
-In a new terminal:
-
-```bash
-# Navigate to frontend
-cd frontend
-
-# Install dependencies
-npm install
-
-# Start the frontend
-npm start
-```
-
-The frontend will open at `http://localhost:3000`
 
 ## 4. Start an Agent (2 minutes)
 
