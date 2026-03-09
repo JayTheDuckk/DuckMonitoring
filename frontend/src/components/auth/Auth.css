@@ -1,4 +1,4 @@
-.login-container {
+.auth-container {
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -12,7 +12,7 @@
   overflow: hidden;
 }
 
-.login-container::before {
+.auth-container::before {
   content: '';
   position: absolute;
   top: -50%;
@@ -37,7 +37,7 @@
   }
 }
 
-.login-card {
+.auth-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 20px;
@@ -63,12 +63,12 @@
   }
 }
 
-.login-header {
+.auth-header {
   text-align: center;
   margin-bottom: 2.5rem;
 }
 
-.login-header h1 {
+.auth-header h1 {
   font-size: 2.5rem;
   background: var(--accent-gradient);
   -webkit-background-clip: text;
@@ -79,14 +79,14 @@
   letter-spacing: -0.5px;
 }
 
-.login-header p {
+.auth-header p {
   color: var(--text-secondary);
   margin: 0;
   font-size: 1rem;
   font-weight: 400;
 }
 
-.login-form {
+.auth-form {
   display: flex;
   flex-direction: column;
   gap: 1.75rem;
@@ -155,7 +155,7 @@
   }
 }
 
-.login-button {
+.auth-button {
   background: var(--accent-gradient);
   color: white;
   border: none;
@@ -172,7 +172,7 @@
   overflow: hidden;
 }
 
-.login-button::before {
+.auth-button::before {
   content: '';
   position: absolute;
   top: 0;
@@ -183,40 +183,40 @@
   transition: left 0.5s;
 }
 
-.login-button:hover:not(:disabled)::before {
+.auth-button:hover:not(:disabled)::before {
   left: 100%;
 }
 
-.login-button:hover:not(:disabled) {
+.auth-button:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
 }
 
-.login-button:active:not(:disabled) {
+.auth-button:active:not(:disabled) {
   transform: translateY(0);
 }
 
-.login-button:disabled {
+.auth-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
 }
 
-.login-footer {
+.auth-footer {
   margin-top: 2.5rem;
   text-align: center;
   font-size: 0.9rem;
   color: var(--text-secondary);
 }
 
-.login-footer a {
+.auth-footer a {
   color: var(--accent-primary);
   text-decoration: none;
   font-weight: 500;
   transition: all 0.2s ease;
 }
 
-.login-footer a:hover {
+.auth-footer a:hover {
   color: var(--accent-secondary);
   text-decoration: underline;
 }
@@ -233,11 +233,11 @@
 }
 
 @media (max-width: 480px) {
-  .login-card {
+  .auth-card {
     padding: 2.5rem 2rem;
   }
 
-  .login-header h1 {
+  .auth-header h1 {
     font-size: 2rem;
   }
 }

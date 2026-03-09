@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
-import './Login.css';
+import './Auth.css';
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -114,9 +114,9 @@ const Login = () => {
 
   if (authLoading) {
     return (
-      <div className="login-container">
-        <div className="login-card">
-          <div className="login-header">
+      <div className="auth-container">
+        <div className="auth-card">
+          <div className="auth-header">
             <h1>Duck Monitoring</h1>
             <p>Loading...</p>
           </div>
@@ -126,15 +126,15 @@ const Login = () => {
   }
 
   return (
-    <div className="login-container">
-      <div className="login-card">
-        <div className="login-header">
+    <div className="auth-container">
+      <div className="auth-card">
+        <div className="auth-header">
           <h1>Duck Monitoring</h1>
           <p>{requires2FA ? 'Two-Factor Authentication' : 'Network Monitoring System'}</p>
         </div>
 
         {!requires2FA ? (
-          <form onSubmit={handleSubmit} className="login-form">
+          <form onSubmit={handleSubmit} className="auth-form">
             {error && <div className="error-message">{error}</div>}
 
             <div className="form-group">
@@ -160,12 +160,12 @@ const Login = () => {
               />
             </div>
 
-            <button type="submit" className="login-button" disabled={loading}>
+            <button type="submit" className="auth-button" disabled={loading}>
               {loading ? 'Logging in...' : 'Login'}
             </button>
           </form>
         ) : (
-          <form onSubmit={handleVerify2FA} className="login-form">
+          <form onSubmit={handleVerify2FA} className="auth-form">
             {error && <div className="error-message">{error}</div>}
 
             <div className="two-factor-prompt">
@@ -190,7 +190,7 @@ const Login = () => {
               />
             </div>
 
-            <button type="submit" className="login-button" disabled={loading || twoFactorCode.length !== 6}>
+            <button type="submit" className="auth-button" disabled={loading || twoFactorCode.length !== 6}>
               {loading ? 'Verifying...' : 'Verify'}
             </button>
 
@@ -201,7 +201,7 @@ const Login = () => {
         )}
 
         {!requires2FA && (
-          <div className="login-footer">
+          <div className="auth-footer">
             <p>
               Don't have an account? <Link to="/register">Register here</Link>
             </p>

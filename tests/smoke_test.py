@@ -10,8 +10,8 @@ def run(playwright: Playwright) -> None:
     # 1. Login Flow
     print("Testing Login Flow...")
     page.goto("http://localhost:3000/login")
-    page.get_by_placeholder("Username").fill("admin")
-    page.get_by_placeholder("Password").fill("admin")
+    page.fill("#username", "admin")
+    page.fill("#password", "admin")
     page.get_by_role("button", name="Login").click()
     
     # Verify Dashboard Load (Fixed selector: "Hosts Overview")
