@@ -97,52 +97,8 @@ class ServiceCheckConfigViewSet(viewsets.ModelViewSet):
             )
             
             # Update host status based on service check results
-            # For ping checks: ok -> up, critical -> down
-            # For other checks: aggregate status from all checks
             host = check_config.host
-            if check_config.check_type == 'ping':
-                # Ping is the primary indicator of host availability
-                if status_result == 'ok':
-                    host.status = 'up'
-                elif status_result == 'critical':
-                    host.status = 'down'
-                host.last_check = timezone.now()
-                host.save()
-            else:
-                # For other checks, determine host status from all service checks
-                # If any ping check exists and is ok, host is up
-                # Otherwise, aggregate from all checks
-                ping_checks = ServiceCheckConfig.objects.filter(
-                    host=host,
-                    check_type='ping',
-                    enabled=True
-                )
-                if ping_checks.exists():
-                    # Use ping check status
-                    ping_status = ping_checks.first().status
-                    if ping_status == 'ok':
-                        host.status = 'up'
-                    elif ping_status == 'critical':
-                        host.status = 'down'
-                    else:
-                        host.status = 'unknown'
-                else:
-                    # No ping check, aggregate from all checks
-                    all_checks = ServiceCheckConfig.objects.filter(host=host, enabled=True)
-                    if all_checks.exists():
-                        # If any check is ok, host is up
-                        # If all are critical, host is down
-                        # Otherwise unknown
-                        has_ok = all_checks.filter(status='ok').exists()
-                        all_critical = all_checks.exclude(status='critical').count() == 0
-                        if has_ok:
-                            host.status = 'up'
-                        elif all_critical and all_checks.count() > 0:
-                            host.status = 'down'
-                        else:
-                            host.status = 'unknown'
-                    host.last_check = timezone.now()
-                    host.save()
+            host.update_status()
             
             return Response({
                 'status': 'Check completed',

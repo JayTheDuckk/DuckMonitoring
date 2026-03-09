@@ -34,6 +34,39 @@ class Host(models.Model):
     def __str__(self):
         return self.hostname
 
+    def update_status(self):
+        """Update host status based on service checks."""
+        from monitoring.models import ServiceCheckConfig
+        
+        ping_checks = ServiceCheckConfig.objects.filter(
+            host=self,
+            check_type='ping',
+            enabled=True
+        )
+        
+        if ping_checks.exists():
+            ping_status = ping_checks.first().status
+            if ping_status == 'ok':
+                self.status = 'up'
+            elif ping_status == 'critical':
+                self.status = 'down'
+            else:
+                self.status = 'unknown'
+        else:
+            all_checks = ServiceCheckConfig.objects.filter(host=self, enabled=True)
+            if all_checks.exists():
+                has_ok = all_checks.filter(status='ok').exists()
+                all_critical = all_checks.exclude(status='critical').count() == 0
+                if has_ok:
+                    self.status = 'up'
+                elif all_critical and all_checks.count() > 0:
+                    self.status = 'down'
+                else:
+                    self.status = 'unknown'
+        
+        self.last_check = timezone.now()
+        self.save()
+
 class UPSDevice(models.Model):
     STATUS_CHOICES = (
         ('ok', 'OK'),

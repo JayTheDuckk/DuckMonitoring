@@ -42,7 +42,7 @@ else
     # pip install -r requirements.txt > /dev/null
     
     # Start Django
-    python3 manage.py runserver 0.0.0.0:8000 > /tmp/duck-monitoring-backend.log 2>&1 &
+    nohup python3 manage.py runserver 0.0.0.0:8000 > /tmp/duck-monitoring-backend.log 2>&1 &
     BACKEND_PID=$!
     echo $BACKEND_PID > /tmp/duck-monitoring-backend.pid
     echo -e "${GREEN}Backend started (PID: $BACKEND_PID)${NC}"
@@ -66,7 +66,7 @@ else
     fi
     
     # Start frontend
-    npm start > /tmp/duck-monitoring-frontend.log 2>&1 &
+    HOST=0.0.0.0 BROWSER=none nohup npm start > /tmp/duck-monitoring-frontend.log 2>&1 &
     FRONTEND_PID=$!
     echo $FRONTEND_PID > /tmp/duck-monitoring-frontend.pid
     echo -e "${GREEN}Frontend started (PID: $FRONTEND_PID)${NC}"
