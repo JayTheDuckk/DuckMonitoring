@@ -163,8 +163,21 @@ def check_snmp_device_task(device_id):
         
         # Store metrics
         for k, v in metrics.items():
-             # Logic similar to original jobs.py
-             pass
+            if isinstance(v, (int, float)):
+                SNMPDeviceMetric.objects.create(
+                    snmp_device=device,
+                    metric_name=k,
+                    metric_type='snmp',
+                    value=v,
+                    unit=''
+                )
+            elif v is not None:
+                SNMPDeviceMetric.objects.create(
+                    snmp_device=device,
+                    metric_name=k,
+                    metric_type='snmp',
+                    value_string=str(v),
+                )
                 
     except SNMPDevice.DoesNotExist:
         pass

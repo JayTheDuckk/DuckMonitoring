@@ -23,7 +23,6 @@ api.interceptors.request.use(
 );
 
 // Add response interceptor
-// Add response interceptor
 api.interceptors.response.use(
   (response) => response,
   async (error) => {

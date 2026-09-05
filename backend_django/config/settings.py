@@ -19,7 +19,10 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-replace-me-in-product
 
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = os.environ.get(
+    'ALLOWED_HOSTS',
+    'localhost,127.0.0.1,0.0.0.0' if DEBUG else 'localhost,127.0.0.1'
+).split(',')
 
 
 # Application definition
@@ -35,6 +38,7 @@ INSTALLED_APPS = [
     # Third-party apps
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
 
@@ -123,13 +127,26 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Custom User Model
 AUTH_USER_MODEL = 'accounts.User'
 
-# CORS
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS — allow all origins only in debug mode; set CORS_ALLOW_ALL_ORIGINS=true to override
+CORS_ALLOW_ALL_ORIGINS = os.environ.get(
+    'CORS_ALLOW_ALL_ORIGINS',
+    'true' if DEBUG else 'false'
+).lower() == 'true'
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
 CORS_ALLOW_CREDENTIALS = True
+
+# Agent API token (optional — when set, agent endpoints require X-Agent-Token header)
+AGENT_API_TOKEN = os.environ.get('AGENT_API_TOKEN', '')
+
+# Email (used by alert notifications)
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'alerts@localhost')
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend'
+)
 
 
 # REST Framework

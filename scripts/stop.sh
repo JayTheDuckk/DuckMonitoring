@@ -35,6 +35,23 @@ else
     fi
 fi
 
+# Stop Celery worker
+if [ -f /tmp/duck-monitoring-celery.pid ]; then
+    CELERY_PID=$(cat /tmp/duck-monitoring-celery.pid)
+    if ps -p $CELERY_PID > /dev/null 2>&1; then
+        kill $CELERY_PID 2>/dev/null || true
+        echo -e "${GREEN}Celery worker stopped (PID: $CELERY_PID)${NC}"
+    else
+        echo -e "${YELLOW}Celery worker process not found${NC}"
+    fi
+    rm -f /tmp/duck-monitoring-celery.pid
+else
+    if pgrep -f "celery -A config worker" > /dev/null; then
+        pkill -f "celery -A config worker"
+        echo -e "${GREEN}Celery worker stopped${NC}"
+    fi
+fi
+
 # Stop frontend
 if [ -f /tmp/duck-monitoring-frontend.pid ]; then
     FRONTEND_PID=$(cat /tmp/duck-monitoring-frontend.pid)
@@ -58,6 +75,16 @@ fi
 # Also kill any node processes that might be related (more aggressive cleanup)
 if pgrep -f "node.*react-scripts" > /dev/null; then
     pkill -f "node.*react-scripts" 2>/dev/null || true
+fi
+
+# Stop Redis only if this script started it (not Homebrew/system-managed)
+REDIS_SELF_STARTED="/tmp/duck-monitoring-redis.self-started"
+if [ -f "$REDIS_SELF_STARTED" ]; then
+    if command -v redis-cli >/dev/null 2>&1; then
+        redis-cli shutdown nosave >/dev/null 2>&1 || true
+        echo -e "${GREEN}Redis stopped (started by Duck Monitoring)${NC}"
+    fi
+    rm -f "$REDIS_SELF_STARTED"
 fi
 
 echo -e "${GREEN}✓ Duck Monitoring stopped${NC}"

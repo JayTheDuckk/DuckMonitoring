@@ -7,11 +7,11 @@ echo ""
 
 # Check if backend is running
 echo "Checking if backend is running..."
-if curl -s http://localhost:5001/api/health > /dev/null 2>&1; then
-    echo "✅ Backend is running on port 5001"
+if curl -s http://localhost:8000/api/health > /dev/null 2>&1; then
+    echo "✅ Backend is running on port 8000"
 else
-    echo "❌ Backend is not running on port 5001"
-    echo "   Please start the backend first: cd backend && python app.py"
+    echo "❌ Backend is not running on port 8000"
+    echo "   Please start the backend first: ./scripts/start.sh"
     exit 1
 fi
 

@@ -15,7 +15,7 @@ const AgentInstall = ({ serverUrl, onClose }) => {
     // Fallback to current window location
     const protocol = window.location.protocol;
     const host = window.location.hostname;
-    const port = window.location.port === '3000' ? '5001' : window.location.port;
+    const port = window.location.port === '3000' ? '8000' : window.location.port;
     return `${protocol}//${host}${port ? ':' + port : ''}`;
   };
 

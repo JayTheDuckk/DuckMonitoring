@@ -38,11 +38,10 @@ A modern, hybrid network monitoring system with agent-based monitoring and histo
 │   ├── agent.py      # Main agent script
 │   └── requirements.txt
 ├── scripts/          # Operational scripts
-│   ├── start.sh      # Start both servers
-│   ├── stop.sh       # Stop both servers
+│   ├── start.sh      # Unified startup (setup + Redis + backend + Celery + frontend)
+│   ├── stop.sh       # Stop all services
 │   ├── status.sh     # Check server status
-│   ├── start-backend.sh  # Start backend only
-│   └── start-frontend.sh # Start frontend only
+│   ├── initial_startup.sh  # Alias for start.sh --reset
 ├── README.md
 ├── docs/             # Documentation
 │   ├── SETUP.md      # Detailed setup instructions
@@ -68,52 +67,37 @@ This will start 6 test hosts (web servers, database, cache, app servers) that au
 
 ## Getting Started
 
-## Getting Started
+### Start Everything
 
-## Getting Started
+One script handles setup, Redis, backend, Celery, and frontend:
 
-### Initial Setup
-
-Duck Monitoring handles its own bootstrapping automatically using the provided initial setup script. You do not need to manually create virtual environments or install dependencies.
-
-1. **Start Initial Setup:**
-   From the project root directory, run the setup script:
-   ```bash
-   ./scripts/initial_startup.sh
-   ```
-   
-   **Warning:** This script is intended for first-time installation and will ask you to confirm a database reset.
-   
-   The script will:
-   - Create a Python virtual environment
-   - Install backend requirements and run fresh database migrations
-   - Install frontend Node dependencies
-   - Start both the Django API (`http://localhost:8000`) and the React UI (`http://localhost:3000`)
-
-2. **Register Admin User:**
-   Once the servers are running, open your web browser to `http://localhost:3000`. You will be directed to an **Initial Setup** page to create your first administrative user.
-
-## Server Management
-
-Easy-to-use scripts for subsequent starts and stops:
-
-### Start Both Servers
 ```bash
 ./scripts/start.sh
 ```
-Starts both backend and frontend servers in the background (requires `initial_startup.sh` to have been run at least once).
 
-### Stop Both Servers
-```bash
-./scripts/stop.sh
-```
-Stops both backend and frontend servers.
+On first run it automatically:
+- Creates the Python virtual environment and installs backend dependencies
+- Runs database migrations
+- Installs frontend Node dependencies
+- Starts Redis if it is not already running
+- Starts the Django API (`http://localhost:8000`), Celery worker, and React UI (`http://localhost:3000`)
 
-### Check Server Status
+To wipe the database and start fresh:
+
 ```bash
-./scripts/status.sh
+./scripts/start.sh --reset
+# or: ./scripts/initial_startup.sh  (same thing)
 ```
-Shows which servers are currently running.
+
+Then open `http://localhost:3000` to register your first admin user.
+
+## Server Management
+
+```bash
+./scripts/start.sh    # Start everything (idempotent)
+./scripts/stop.sh     # Stop backend, Celery, frontend (and Redis if we started it)
+./scripts/status.sh   # Check what's running
+```
 
 ### Individual Server Control
 ```bash
@@ -124,6 +108,7 @@ Shows which servers are currently running.
 **Note:** Server logs are written to:
 - Backend: `/tmp/duck-monitoring-backend.log`
 - Frontend: `/tmp/duck-monitoring-frontend.log`
+- Celery: `/tmp/duck-monitoring-celery.log`
 
 ### Agent Setup
 

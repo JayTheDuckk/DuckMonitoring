@@ -1,13 +1,13 @@
 from rest_framework import views, status
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
 from django.utils import timezone
 from django.db import transaction
 from inventory.models import Host
 from .models import Check, Metric, ServiceCheckResult
+from .permissions import AgentTokenPermission
 
 class AgentRegisterView(views.APIView):
-    permission_classes = [AllowAny] # Ideally secure this with a shared secret or token
+    permission_classes = [AgentTokenPermission]
 
     def post(self, request):
         agent_id = request.data.get('agent_id')
@@ -30,7 +30,7 @@ class AgentRegisterView(views.APIView):
         return Response({'status': 'registered', 'host_id': host.id})
 
 class AgentSubmitView(views.APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [AgentTokenPermission]
 
     def post(self, request):
         agent_id = request.data.get('agent_id')

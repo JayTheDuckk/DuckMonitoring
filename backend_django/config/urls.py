@@ -19,13 +19,19 @@ def root_view(request):
             'monitoring': '/api/monitoring/',
             'agents': '/api/agents/',
             'alerts': '/api/alerts/',
+            'health': '/api/health/',
         },
         'frontend': 'http://localhost:3000',
         'docs': 'API endpoints are available at /api/*'
     })
 
+def health_view(request):
+    """Health check endpoint for load balancers and Docker test hosts"""
+    return JsonResponse({'status': 'ok'})
+
 urlpatterns = [
     path('', root_view, name='root'),
+    path('api/health/', health_view, name='health'),
     path('admin/', admin.site.urls),
     
     # Auth endpoints
