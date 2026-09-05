@@ -1,61 +1,90 @@
-# Duck Monitoring Architecture Deep Dive
+# Architecture
 
-Understanding the architecture of Duck Monitoring is crucial for advanced deployments, custom integrations, or contributing to the codebase.
+Duck Monitoring is a personal LAN inventory and monitoring stack. The browser talks to one origin. Agents and agentless polls are optional.
 
-## 1. High-Level Topology
-
-Duck Monitoring operates on a centralized Server-Agent model with agentless fallback capabilities.
+## Compose topology (supported)
 
 ```text
-+-----------------------+       +------------------------+
-|    Client Browser     |       |   Remote Monitored     |
-|   (React Frontend)    |       |        Host            |
-+-----------+-----------+       +-----------+------------+
-            |                               |
-            | HTTP / JWT                    | HTTP POST (JSON)
-            v                               v
-+--------------------------------------------------------+
-|                     CORE SERVER                        |
-|                                                        |
-|  +-----------------+                +---------------+  |
-|  | Nginx Webserver |                | Django Rest   |  |
-|  | (Static Assets) |                | Framework API |  |
-|  +-----------------+                +-------+-------+  |
-|                                             |          |
-|                                             |          |
-|  +-----------------+                +-------+-------+  |
-|  |   PostgreSQL    |<---------------| Alerting &    |  |
-|  |   Database      |                | Eval Engine   |  |
-|  +-----------------+                +---------------+  |
-+--------------------------------------------------------+
+                         Host LAN collector (macOS)
+                         scripts/lan_identity.py
+                         data/lan/identity.json
+                                    |
++------------------+                v
+| Browser :3000    |     +----------------------+
+| Hosts, Discovery |     | frontend (nginx)     |
+| Alerts, Hardware |---->| SPA + /api /admin    |
++------------------+     +----------+-----------+
+                                    |
+                                    v
+                         +----------------------+      +--------+
+                         | backend (gunicorn)   |<---->| Redis  |
+                         | Django 6 + DRF       |      +--------+
+                         | inventory, discovery |           |
+                         | alerts, agents       |      +----+-----+
+                         +----------+-----------+      | Celery   |
+                                    |                  | worker + |
+                                    v                  | beat     |
+                         +----------------------+      +----------+
+                         | Postgres 18          |
+                         +----------------------+
+
+Optional: Python agents POST /api/agents/submit/
+Optional: Watch LAN + Celery ping / SNMP / UPS
 ```
 
-## 2. Component breakdown
+You do not publish port 8000. Nginx in the UI container proxies `/api` and `/admin` to gunicorn.
 
-### 2.1. The Frontend (React SPA)
-The frontend is a pure Single Page Application built with React.
-- **Routing:** Handled entirely client-side via `react-router-dom`.
-- **State Management:** Core contextual states (like Authentication) are managed via React Context (`AuthContext.js`). Local component states handle widget data.
-- **API Communication:** All data is fetched asynchronously using Axios. Requests are intercepted to automatically append the JWT Bearer token required by the backend.
+Local `./scripts/start.sh` is the same apps without Compose: Vite on 3000, Django on 8000, SQLite, host-network Discovery.
 
-### 2.2. The Backend (Django REST Framework)
-The backend acts as the definitive source of truth and the processing engine.
-- **Stateless API:** It exposes REST endpoints. It does not render HTML templates (except for the built-in Django Admin, which is rarely used here).
-- **Metric Ingestion:** The `/api/agents/submit/` endpoint is heavily optimized to accept large JSON payloads from agents.
-- **Alert Evaluation:** When metrics are ingested, they are immediately cross-referenced against `AlertRule` models in the database to trigger state changes.
-- **Agentless Polling:** Background tasks/views handle initiating ICMP pings or SNMP GET requests for unmanaged devices.
+## Pieces
 
-### 2.3. The Database Layer (PostgreSQL/SQLite)
-- Relational mapping handles complex relationships seamlessly (e.g., A `Host` belongs to a `HostGroup`, and has many `Metrics`).
-- **Time-Series Management:** Metrics are stored as discrete rows. Over time, these tables grow massive. A management command (`cleanup_metrics`) is utilized to prune stale historical data and maintain performance.
+### Frontend
 
-### 2.4. The Agent (Python)
-The monitoring agent is incredibly lightweight by design to avoid impacting the performance of the host it is monitoring.
-- **Dependencies:** It relies primarily on standard Python libraries plus `psutil` for OS-level metric extraction and `requests` for payload submission.
-- **Execution:** It runs synchronously in a loop. If the core server is unreachable, the agent drops the current payload and simply attempts again on the next interval, preventing memory bloat from queueing.
+React 19 + Vite SPA. Production image is a static nginx build (`VITE_API_URL=/api`).
 
-## 3. Security Model
+- Routing: `react-router-dom`
+- Auth: JWT in `localStorage`, Axios interceptor on `frontend/src/services/api.js`
+- Theme: IBM Plex Mono, light/dark tokens in `frontend/src/index.css`
 
-- **Authentication:** Users authenticate via standard username/password to receive a JWT access and refresh token. 
-- **Agent Authorization:** Agents generate unique UUIDs upon installation. They authenticate to the API using their assigned UUID and optionally a shared global Auth Token defined in the main server configuration (`settings.py`).
-- **Auditing:** Administrative actions (like deleting a host or modifying alert rules) generate records in the `AuditLog` table, viewable from the frontend settings.
+Hosts Overview is the lasting inventory (groups, drag-and-drop, Watch LAN). Discovery is the scan/import surface.
+
+### Backend
+
+Django 6 + Django REST Framework. Apps:
+
+| App | Role |
+|-----|------|
+| `accounts` | Users, first-run setup, audit log |
+| `inventory` | Hosts, groups, UPS, SNMP, Watch LAN |
+| `discovery` | Scan jobs, observations, persistence |
+| `monitoring` | Agent ingest, checks, metrics, dashboards |
+| `alerts` | Rules, channels, default new/gone/down pack |
+| `topology` | Graph for the map page |
+| `core` | Fingerprint, mDNS, quiet probe, SNMP/UPS helpers |
+
+OS labels are only stored when fingerprinting can name a specific OS (Windows, macOS, iOS, tvOS, Android, Linux, Embedded Linux). Slash-unions like “iOS/Android/macOS” are not shown.
+
+### Data
+
+- **Compose:** Postgres. Host identity from the macOS collector is a JSON file under `data/lan/` (gitignored).
+- **Local start.sh:** SQLite at repo-root `db.sqlite3`.
+- Metrics are relational rows. Redis is the Celery broker.
+
+### Agents
+
+Lightweight `psutil` loop. If the server is down, the current payload is dropped. Register/submit live at `/api/agents/register/` and `/api/agents/submit/`. Optional `AGENT_API_TOKEN`.
+
+### Agentless / LAN
+
+Celery runs ping and other service checks. Discovery combines active scan with passive mDNS, SSDP, and ARP. Watch LAN writes new observations into `Host` rows so the Overview does not reset on every scan.
+
+## Security
+
+- Browser users get JWT access + refresh tokens.
+- First admin is created in the setup wizard; there is no fixture password.
+- Agents use a generated UUID and optional shared token.
+- Admin actions write `AuditLog` rows (Settings → Audit log).
+
+## Rebuild note
+
+Frontend and backend images copy source at build time. After you change CSS, JS, or Python, rebuild that service. Bind-mounts are only used for `data/lan`.

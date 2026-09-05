@@ -1,97 +1,57 @@
-# Agent Installation Guide
+# Agent installation
 
-This guide explains how to install and run the Duck Monitoring agent on a remote host.
+The agent is optional. Hosts Overview can watch a LAN with ping and Discovery alone. Use an agent when you want CPU, memory, disk, and network from that machine.
+
+Prefer the **Agent** button on Hosts Overview — it builds a command for this server. Manual steps below.
+
+## Which server URL?
+
+| How the server runs | `--server` / curl host |
+|---------------------|-------------------------|
+| `./scripts/docker-up.sh` | `http://localhost:3000` (or the LAN IP on port 3000). Nginx proxies `/api`. |
+| `./scripts/start.sh` | `http://localhost:8000` |
+
+Health: `GET /api/health/` → `{"status":"ok"}`.
 
 ## Prerequisites
 
-- Python 3.8 or higher
-- Network access to the monitoring server
-- `pip` package manager
-- `curl` or `wget` (for automatic installation)
+- Python 3.11+ (3.13 is what CI uses)
+- Reachability to the monitoring server
+- `pip`, and `curl` or `wget` if you use the one-liner
 
-## One-Command Installation (Recommended)
-
-The easiest way to install an agent is using the install script served by the API:
-
-```bash
-# Download and run the installation script
-curl -sSL http://your-monitoring-server:8000/api/agent/install.sh | sudo bash
-
-# Or with custom options
-curl -sSL http://your-monitoring-server:8000/api/agent/install.sh | sudo bash -s -- --hostname my-server-name --interval 30
-```
-
-**What this does:**
-- Downloads the installation script from your monitoring server
-- Automatically configures the server URL
-- Downloads agent files (agent.py, requirements.txt)
-- Creates a Python virtual environment
-- Installs dependencies
-- Sets up a systemd service (on Linux) for automatic startup
-- Starts the agent service
-
-**Options you can pass:**
-- `--hostname NAME`: Set a custom hostname (default: system hostname)
-- `--install-dir DIR`: Custom installation directory (default: /opt/duck-monitoring-agent)
-- `--interval SEC`: Collection interval in seconds (default: 60)
-
-## Manual Installation
-
-If you prefer to install manually:
-
-### Step 1: Copy Agent Files to Target Host
-
-You can either:
-- **Option A**: Clone the repository on the target host
-- **Option B**: Copy just the `agent/` directory to the target host
-
-```bash
-# Option A: Clone repository
-git clone <repository-url>
-cd agent
-
-# Option B: Copy agent directory
-scp -r agent/ user@target-host:/opt/duck-monitoring-agent/
-ssh user@target-host
-cd /opt/duck-monitoring-agent
-```
-
-### Step 2: Install Python Dependencies
+## Manual install
 
 ```bash
 cd agent
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install -r requirements.txt
+python agent.py --server http://localhost:3000 --hostname my-server-name
 ```
 
-### Step 3: Run the Agent
+Use `:8000` if you started the API with `./scripts/start.sh`.
 
-**Basic usage:**
-```bash
-python agent.py --server http://your-monitoring-server:8000 --hostname my-server-name
-```
-
-**With custom options:**
 ```bash
 python agent.py \
-  --server http://your-monitoring-server:8000 \
+  --server http://192.168.0.60:3000 \
   --hostname my-server-name \
   --interval 60
 ```
 
-## Running as a Service
+Clone the repo or copy only `agent/` onto the target host.
 
-### Linux (systemd)
+## Options
 
-Create a systemd service file for automatic startup:
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--server` | Base URL of the monitoring server | required |
+| `--hostname` | Name to register | system hostname |
+| `--agent-id` | Stable UUID | generated |
+| `--auth-token` | Shared token (`AGENT_API_TOKEN` on the server) | none |
+| `--interval` | Seconds between posts | 60 |
 
-1. Create the service file:
-```bash
-sudo nano /etc/systemd/system/duck-monitoring-agent.service
-```
+## Linux (systemd)
 
-2. Add the following content (adjust paths as needed):
 ```ini
 [Unit]
 Description=Duck Monitoring Agent
@@ -100,9 +60,9 @@ After=network.target
 [Service]
 Type=simple
 User=your-username
-WorkingDirectory=/opt/duck-monitoring-agent/agent
-Environment="PATH=/opt/duck-monitoring-agent/agent/venv/bin"
-ExecStart=/opt/duck-monitoring-agent/agent/venv/bin/python agent.py --server http://your-monitoring-server:8000 --hostname %H
+WorkingDirectory=/opt/duck-monitoring-agent
+Environment="PATH=/opt/duck-monitoring-agent/venv/bin"
+ExecStart=/opt/duck-monitoring-agent/venv/bin/python agent.py --server http://YOUR-SERVER:3000 --hostname %H
 Restart=always
 RestartSec=10
 
@@ -110,28 +70,16 @@ RestartSec=10
 WantedBy=multi-user.target
 ```
 
-3. Enable and start the service:
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable duck-monitoring-agent
-sudo systemctl start duck-monitoring-agent
-```
-
-4. Check status:
-```bash
+sudo systemctl enable --now duck-monitoring-agent
 sudo systemctl status duck-monitoring-agent
 ```
 
-### macOS (launchd)
+## macOS (launchd)
 
-Create a launchd plist file:
+`~/Library/LaunchAgents/com.duckmonitoring.agent.plist`:
 
-1. Create the plist file:
-```bash
-nano ~/Library/LaunchAgents/com.duckmonitoring.agent.plist
-```
-
-2. Add the following content:
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -141,142 +89,64 @@ nano ~/Library/LaunchAgents/com.duckmonitoring.agent.plist
     <string>com.duckmonitoring.agent</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/opt/duck-monitoring-agent/agent/venv/bin/python</string>
-        <string>/opt/duck-monitoring-agent/agent/agent.py</string>
+        <string>/opt/duck-monitoring-agent/venv/bin/python</string>
+        <string>/opt/duck-monitoring-agent/agent.py</string>
         <string>--server</string>
-        <string>http://your-monitoring-server:8000</string>
-        <string>--hostname</string>
-        <string>$(hostname)</string>
+        <string>http://YOUR-SERVER:3000</string>
     </array>
     <key>WorkingDirectory</key>
-    <string>/opt/duck-monitoring-agent/agent</string>
+    <string>/opt/duck-monitoring-agent</string>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
-    <key>StandardOutPath</key>
-    <string>/var/log/duck-monitoring-agent.log</string>
-    <key>StandardErrorPath</key>
-    <string>/var/log/duck-monitoring-agent.error.log</string>
 </dict>
 </plist>
 ```
 
-3. Load and start the service:
 ```bash
 launchctl load ~/Library/LaunchAgents/com.duckmonitoring.agent.plist
-launchctl start com.duckmonitoring.agent
 ```
 
-### Windows (Service)
+There is also `agent/install_agent_macos.sh` if you want a scripted install.
 
-For Windows, you can use NSSM (Non-Sucking Service Manager):
+## Windows
 
-1. Download NSSM from https://nssm.cc/download
-2. Install the service:
-```cmd
-nssm install DuckMonitoringAgent
-```
-
-3. Configure the service:
-   - **Path**: `C:\Python39\python.exe` (or your Python path)
-   - **Startup directory**: `C:\duck-monitoring-agent\agent`
-   - **Arguments**: `agent.py --server http://your-monitoring-server:8000 --hostname %COMPUTERNAME%`
-
-4. Start the service:
-```cmd
-nssm start DuckMonitoringAgent
-```
-
-## Agent Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--server` | URL of the monitoring server | Required |
-| `--hostname` | Hostname to register | System hostname |
-| `--agent-id` | Custom agent ID (UUID) | Auto-generated |
-| `--auth-token` | Authentication token | None |
-| `--interval` | Collection interval in seconds | 60 |
-
-## Example Commands
-
-**Basic installation:**
-```bash
-python agent.py --server http://192.168.1.100:8000
-```
-
-**Custom hostname:**
-```bash
-python agent.py --server http://192.168.1.100:8000 --hostname web-server-01
-```
-
-**Faster collection (30 seconds):**
-```bash
-python agent.py --server http://192.168.1.100:8000 --interval 30
-```
-
-**Remote server:**
-```bash
-python agent.py --server https://monitoring.example.com:8000 --hostname production-db
-```
+NSSM works: point it at `python.exe` with `agent.py --server http://YOUR-SERVER:3000`. `agent/install_agent_windows.ps1` is in the repo.
 
 ## Verification
 
-After starting the agent, verify it's working:
-
-1. **Check agent logs** - The agent will print status messages
-2. **Check the dashboard** - The host should appear in the Duck Monitoring dashboard
-3. **Check metrics** - Navigate to the host detail page to see metrics being collected
+The host should show on Hosts Overview. Open the host detail page for CPU / memory / disk once submit is flowing.
 
 ## Troubleshooting
 
-### Agent can't connect to server
-- Verify the server URL is correct and accessible
-- Check firewall rules allow outbound connections
-- Test connectivity: `curl http://your-server:8000/api/health`
+**Cannot connect**
 
-### Agent not appearing in dashboard
-- Check that the agent is running (no errors in output)
-- Verify the server is running and accessible
-- Check backend logs for registration errors
+- `--server` host and port match the table above
+- `curl http://YOUR-SERVER:3000/api/health/` (or `:8000` locally)
+- Firewall allows outbound HTTP
 
-### Permission errors
-- Ensure the agent has permission to read system metrics
-- On Linux, may need to run with appropriate permissions
-- Check that `psutil` can access system information
+**Never appears**
 
-### High CPU usage
-- Increase the `--interval` to collect less frequently
-- Default 60 seconds is usually fine for most use cases
+- Agent stdout / systemd journal
+- `docker compose logs backend` or `/tmp/duck-monitoring-backend.log`
 
-## Security Considerations
+**High CPU on the agent host**
 
-- The agent communicates with the server over HTTP by default
-- For production, consider:
-  - Using HTTPS (configure reverse proxy with SSL)
-  - Implementing authentication tokens
-  - Using VPN or private network
-  - Restricting agent registration to known IPs
+Raise `--interval` (default 60s is enough).
 
-## Uninstallation
+## Security
 
-### Linux (systemd)
+HTTP on a home LAN is the usual setup. For anything exposed further: HTTPS in front of nginx, set `AGENT_API_TOKEN`, and keep the UI off the public internet.
+
+## Uninstall
+
 ```bash
-sudo systemctl stop duck-monitoring-agent
-sudo systemctl disable duck-monitoring-agent
+sudo systemctl disable --now duck-monitoring-agent
 sudo rm /etc/systemd/system/duck-monitoring-agent.service
-sudo systemctl daemon-reload
 ```
 
-### macOS (launchd)
 ```bash
 launchctl unload ~/Library/LaunchAgents/com.duckmonitoring.agent.plist
 rm ~/Library/LaunchAgents/com.duckmonitoring.agent.plist
 ```
-
-### Windows (NSSM)
-```cmd
-nssm stop DuckMonitoringAgent
-nssm remove DuckMonitoringAgent
-```
-

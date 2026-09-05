@@ -1,93 +1,66 @@
-# Docker Test Hosts
+# Docker test hosts
 
-This directory contains Docker configuration to run multiple test hosts for monitoring.
+Fake agents that report into a running Duck Monitoring server. They are not the main stack — that is `./scripts/docker-up.sh` at the repo root.
 
-## Quick Start
+## Point them at the right API
 
-1. **Make sure your backend is running** on `http://localhost:8000`
+| Server you already started | `SERVER_URL` |
+|----------------------------|--------------|
+| `./scripts/start.sh` (API on host :8000) | `http://host.docker.internal:8000` (default in this compose file) |
+| `./scripts/docker-up.sh` (UI/API on host :3000) | `http://host.docker.internal:3000` |
 
-2. **Start all test hosts:**
-   ```bash
-   cd docker
-   docker-compose up -d
-   ```
+Health check from your Mac:
 
-3. **View running containers:**
-   ```bash
-   docker-compose ps
-   ```
-
-4. **View logs from all hosts:**
-   ```bash
-   docker-compose logs -f
-   ```
-
-5. **View logs from a specific host:**
-   ```bash
-   docker-compose logs -f web-server-1
-   ```
-
-6. **Stop all hosts:**
-   ```bash
-   docker-compose down
-   ```
-
-## Test Hosts
-
-The following hosts will be created:
-
-- **web-server-1** - Web server instance 1
-- **web-server-2** - Web server instance 2
-- **db-server** - Database server
-- **cache-server** - Cache server
-- **app-server-1** - Application server 1
-- **app-server-2** - Application server 2
-
-Each host runs the monitoring agent and reports metrics every 30 seconds.
-
-## Configuration
-
-### Change Server URL
-
-If your backend is running on a different host/port, edit `docker-compose.yml` and change:
-```yaml
-SERVER_URL=http://host.docker.internal:8000
+```bash
+# local start.sh
+curl http://localhost:8000/api/health/
+# Compose
+curl http://localhost:3000/api/health/
 ```
 
-For Linux, you may need to use your host IP instead:
-```yaml
-SERVER_URL=http://192.168.1.100:8000
+On Linux, `host.docker.internal` may need the host IP instead.
+
+## Start
+
+```bash
+cd docker
+docker compose up -d
 ```
 
-### Change Collection Interval
+The compose file defaults to `:8000`. For the main Compose stack, change each service’s `SERVER_URL` to `http://host.docker.internal:3000`, then `docker compose up -d --build`.
 
-Edit the `CMD` in `Dockerfile.agent` to change the `--interval` value (in seconds).
+```bash
+docker compose ps
+docker compose logs -f
+docker compose logs -f web-server-1
+docker compose down
+```
 
-### Add More Hosts
+## Hosts
 
-Copy one of the service definitions in `docker-compose.yml` and modify the name, hostname, and agent-id.
+- web-server-1 / web-server-2
+- db-server
+- cache-server
+- app-server-1 / app-server-2
+
+Each runs the monitoring agent about every 30 seconds (`INTERVAL`). They should show up on Hosts Overview.
+
+## Tweaks
+
+- **Interval:** `CMD` / `INTERVAL` in `Dockerfile.agent` or the service environment.
+- **More hosts:** copy a service block; change `container_name`, `HOSTNAME`, and `AGENT_ID`.
 
 ## Troubleshooting
 
-**Hosts not connecting to backend:**
-- Verify backend is running: `curl http://localhost:8000/api/health`
-- Check if `host.docker.internal` works on your system (macOS/Windows should work)
-- On Linux, you may need to use your actual host IP address
+**Not connecting**
 
-**View agent logs:**
+- Server health URL from the table above
+- `host.docker.internal` works on Docker Desktop; on Linux use the host IP
+- `docker compose logs web-server-1`
+
+**Rebuild**
+
 ```bash
-docker-compose logs web-server-1
+docker compose build
+docker compose up -d
 ```
-
-**Rebuild containers:**
-```bash
-docker-compose build
-docker-compose up -d
-```
-
-**Remove all containers and networks:**
-```bash
-docker-compose down -v
-```
-
-
