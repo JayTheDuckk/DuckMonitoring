@@ -182,13 +182,11 @@ def discover_host(ip: str, scan_ports: bool = True, known_mac: str = None) -> Op
         mac = get_mac_address(ip)
         if mac:
             host_info['mac_address'] = mac
-            
+
     if host_info.get('mac_address'):
         host_info['vendor'] = get_vendor(host_info['mac_address'])
 
     return host_info
-    
-# ... (get_mac_address, get_default_gateway, get_vendor, parse_network_range remain same)
 
 def perform_discovery(network: str, scan_ports: bool = True, max_workers: int = 50) -> Dict:
     try:
@@ -219,28 +217,26 @@ def perform_discovery(network: str, scan_ports: bool = True, max_workers: int = 
 def get_mac_address(ip: str) -> Optional[str]:
     """
     Get MAC address for an IP using system arp command.
+    Pings the host first to populate the ARP table if needed.
     """
     try:
-        # Ping first to populate ARP table (already done in discover_host but good to be safe)
+        # Populate ARP cache
+        ping_host(ip, timeout=1)
+
         if platform.system().lower() == 'windows':
             cmd = ['arp', '-a', ip]
         else:
-            cmd = ['arp', '-n', ip] # Linux/Mac
-            
+            cmd = ['arp', '-n', ip]
+
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
         output = result.stdout
-        
-        # Parse output
-        # Mac/Linux: ? (192.168.1.1) at 00:11:22:33:44:55 on en0 ifscope [ethernet]
-        # Windows: 192.168.1.1       00-11-22-33-44-55     dynamic
-        
+
         import re
-        # Look for standard MAC pattern
         mac_regex = re.compile(r'([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})')
         match = mac_regex.search(output)
         if match:
             return match.group(0).replace('-', ':').upper()
-    except:
+    except Exception:
         pass
     return None
 

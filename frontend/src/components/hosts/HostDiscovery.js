@@ -200,6 +200,8 @@ const HostDiscovery = () => {
         const q = searchFilter.toLowerCase();
         return h.ip_address.includes(q) ||
             (h.hostname || '').toLowerCase().includes(q) ||
+            (h.mac_address || '').toLowerCase().includes(q) ||
+            (h.vendor || '').toLowerCase().includes(q) ||
             (h.suggested_type || '').toLowerCase().includes(q);
     }) || [];
 
@@ -219,7 +221,7 @@ const HostDiscovery = () => {
                 </div>
                 <div>
                     <h1>Network Discovery</h1>
-                    <p>Scan your network to find devices, open ports, and services</p>
+                    <p>Scan your network to find devices, MAC addresses, open ports, and services</p>
                 </div>
             </div>
 
@@ -368,6 +370,8 @@ const HostDiscovery = () => {
                                         <th></th>
                                         <th>Status</th>
                                         <th>IP Address</th>
+                                        <th>MAC Address</th>
+                                        <th>Vendor</th>
                                         <th>Hostname</th>
                                         <th>Latency</th>
                                         <th>Services</th>
@@ -391,6 +395,8 @@ const HostDiscovery = () => {
                                                 </td>
                                                 <td><span className="host-status-dot"></span></td>
                                                 <td className="host-ip-cell">{host.ip_address}</td>
+                                                <td className="host-mac-cell">{host.mac_address || '—'}</td>
+                                                <td className="host-vendor-cell">{host.vendor || '—'}</td>
                                                 <td className="host-hostname-cell">{host.hostname || '—'}</td>
                                                 <td className="host-latency-cell">
                                                     {host.latency != null ? (
@@ -424,7 +430,7 @@ const HostDiscovery = () => {
                                             {/* Expanded services row */}
                                             {expandedHosts.has(host.ip_address) && host.services?.length > 0 && (
                                                 <tr className="services-expansion">
-                                                    <td colSpan="8">
+                                                    <td colSpan="10">
                                                         <div className="services-expansion-inner">
                                                             <div className="services-expansion-header">
                                                                 <h4>Detected Services — select to create service checks</h4>

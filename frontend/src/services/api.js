@@ -27,17 +27,24 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const requestUrl = originalRequest?.url || '';
+
+    // Never intercept auth endpoints — let login/register handle their own errors
+    const isAuthEndpoint = /\/auth\/(token|register|setup-status)/.test(requestUrl);
+    if (isAuthEndpoint) {
+      return Promise.reject(error);
+    }
 
     // Check if error is 401 and we haven't retried yet
     if (error.response?.status === 401 && !originalRequest._retry) {
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (!refreshToken) {
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (!refreshToken) {
-          throw new Error('No refresh token available');
-        }
-
         // Call refresh endpoint
         const response = await axios.post(`${API_BASE_URL}/auth/token/refresh/`, {
           refresh: refreshToken
@@ -62,7 +69,9 @@ api.interceptors.response.use(
         // Clear tokens and redirect to login
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
-        window.location.href = '/login';
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
 
         return Promise.reject(refreshError);
       }
