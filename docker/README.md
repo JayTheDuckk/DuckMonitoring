@@ -4,7 +4,7 @@ This directory contains Docker configuration to run multiple test hosts for moni
 
 ## Quick Start
 
-1. **Make sure your backend is running** on `http://localhost:5001`
+1. **Make sure your backend is running** on `http://localhost:8000`
 
 2. **Start all test hosts:**
    ```bash
@@ -51,12 +51,12 @@ Each host runs the monitoring agent and reports metrics every 30 seconds.
 
 If your backend is running on a different host/port, edit `docker-compose.yml` and change:
 ```yaml
-SERVER_URL=http://host.docker.internal:5001
+SERVER_URL=http://host.docker.internal:8000
 ```
 
 For Linux, you may need to use your host IP instead:
 ```yaml
-SERVER_URL=http://192.168.1.100:5001
+SERVER_URL=http://192.168.1.100:8000
 ```
 
 ### Change Collection Interval
@@ -70,7 +70,7 @@ Copy one of the service definitions in `docker-compose.yml` and modify the name,
 ## Troubleshooting
 
 **Hosts not connecting to backend:**
-- Verify backend is running: `curl http://localhost:5001/api/health`
+- Verify backend is running: `curl http://localhost:8000/api/health`
 - Check if `host.docker.internal` works on your system (macOS/Windows should work)
 - On Linux, you may need to use your actual host IP address
 

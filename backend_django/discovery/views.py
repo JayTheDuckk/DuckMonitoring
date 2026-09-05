@@ -33,7 +33,9 @@ class DiscoveredHostViewSet(viewsets.ReadOnlyModelViewSet):
         host = Host.objects.create(
             hostname=discovered_host.hostname or discovered_host.ip_address,
             ip_address=discovered_host.ip_address,
-            status='unknown' # Initial status until checked
+            mac_address=discovered_host.mac_address,
+            vendor=discovered_host.manufacturer,
+            status='unknown'
         )
         
         discovered_host.status = 'added'

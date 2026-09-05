@@ -27,6 +27,28 @@ fi
 
 echo ""
 
+# Check Redis
+if command -v redis-cli >/dev/null 2>&1 && redis-cli ping >/dev/null 2>&1; then
+    echo -e "${GREEN}✓ Redis: Running${NC}"
+else
+    echo -e "${RED}✗ Redis: Not running${NC}"
+fi
+
+echo ""
+
+# Check Celery worker
+if pgrep -f "celery -A config worker" > /dev/null; then
+    CELERY_PID=$(pgrep -f "celery -A config worker" | head -n 1)
+    echo -e "${GREEN}✓ Celery worker: Running (PID: $CELERY_PID)${NC}"
+    if [ -f /tmp/duck-monitoring-celery.log ]; then
+        echo "  Logs: /tmp/duck-monitoring-celery.log"
+    fi
+else
+    echo -e "${RED}✗ Celery worker: Not running${NC}"
+fi
+
+echo ""
+
 # Check frontend
 if pgrep -f "react-scripts start" > /dev/null; then
     FRONTEND_PID=$(pgrep -f "react-scripts start" | head -n 1)

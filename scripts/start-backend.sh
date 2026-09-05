@@ -1,44 +1,40 @@
 #!/bin/bash
 
 # Duck Monitoring - Start Backend Only
-
-set -e
+# Delegates to the unified start script
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 BACKEND_DIR="$PROJECT_ROOT/backend_django"
+VENV_PATH="$BACKEND_DIR/venv"
 
-# Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-echo -e "${GREEN}Starting Duck Monitoring Backend...${NC}"
+# Source helper functions from start.sh by running setup + backend only
+source_helpers() {
+    redis_running() {
+        command -v redis-cli >/dev/null 2>&1 && redis-cli ping >/dev/null 2>&1
+    }
+}
 
-# Check if backend is already running
-if pgrep -f "manage.py runserver" > /dev/null; then
+source_helpers
+
+if pgrep -f "manage.py runserver" >/dev/null; then
     echo -e "${YELLOW}Backend server is already running${NC}"
     exit 0
 fi
 
-cd "$PROJECT_ROOT/backend_django"
-
-# Check for venv in backend_django
-if [ -d "$PROJECT_ROOT/backend_django/venv" ]; then
-    VENV_PATH="$PROJECT_ROOT/backend_django/venv"
-else
-    echo -e "${RED}Error: Virtual environment not found. Please run setup first.${NC}"
+if [ ! -d "$VENV_PATH" ]; then
+    echo -e "${RED}Error: Virtual environment not found. Run ./scripts/start.sh first.${NC}"
     exit 1
 fi
 
-# Activate virtual environment and start backend
+cd "$BACKEND_DIR"
 source "$VENV_PATH/bin/activate"
-python3 manage.py runserver 0.0.0.0:8000 > /tmp/duck-monitoring-backend.log 2>&1 &
-BACKEND_PID=$!
-echo $BACKEND_PID > /tmp/duck-monitoring-backend.pid
-echo -e "${GREEN}Backend started (PID: $BACKEND_PID)${NC}"
-echo -e "${YELLOW}Backend logs: /tmp/duck-monitoring-backend.log${NC}"
+nohup python3 manage.py runserver 0.0.0.0:8000 > /tmp/duck-monitoring-backend.log 2>&1 &
+echo $! > /tmp/duck-monitoring-backend.pid
+echo -e "${GREEN}Backend started (PID: $(cat /tmp/duck-monitoring-backend.pid))${NC}"
 echo -e "${GREEN}Backend: http://localhost:8000${NC}"
-
-

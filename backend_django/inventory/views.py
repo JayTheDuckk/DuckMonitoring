@@ -163,7 +163,7 @@ class DiscoveryViewSet(viewsets.ViewSet):
         
         for host_data in hosts_data:
             ip = host_data.get('ip_address')
-            hostname = host_data.get('hostname') or ip
+            hostname = host_data.get('mdns_name') or host_data.get('hostname') or ip
             
             # Check if exists, update detailed info if so
             # mac_address and vendor are passed from frontend (which got them from discovery)
@@ -171,7 +171,7 @@ class DiscoveryViewSet(viewsets.ViewSet):
                 'hostname': hostname,
                 'status': 'up',
                 'mac_address': host_data.get('mac_address'),
-                'vendor': host_data.get('vendor')
+                'vendor': host_data.get('vendor') if host_data.get('mac_type') == 'manufacturer' or host_data.get('vendor_source') in ('mdns_guess', 'ssdp_guess') else None,
             }
             
             host, created = Host.objects.update_or_create(

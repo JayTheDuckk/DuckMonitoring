@@ -8,29 +8,21 @@
 
 ## Initial Setup
 
-The easiest way to perform a new installation or factory reset of Duck Monitoring is to use the provided initial startup script. It handles creating virtual environments, installing dependencies, and running fresh migrations automatically.
+Run the unified startup script from the project root:
 
-1. **Start the Initial Setup:**
-   From the project root, run the setup script:
-   ```bash
-   ./scripts/initial_startup.sh
-   ```
+```bash
+./scripts/start.sh
+```
 
-   **Warning:** This script will prompt you for confirmation because it deletes the existing SQLite database (if any) to ensure a clean boot.
+This handles everything automatically — virtual environment, dependencies, migrations, Redis, backend, Celery, and frontend.
 
-   The script will perform the following actions automatically:
-   - Create a Python virtual environment in `backend_django/venv`
-   - Install backend dependencies from `requirements.txt`
-   - Run initial database migrations (`db.sqlite3` is used by default)
-   - Install frontend Node dependencies
-   - Start the backend API on port `8000`
-   - Start the frontend web application on port `3000`
+To factory-reset (wipes the SQLite database):
 
-2. **Register First User via Browser:**
-   Once the servers are running:
-   - Open your web browser and navigate to `http://localhost:3000`
-   - You will be automatically redirected to the **Initial Setup** page.
-   - Fill out the form to create your first administrative user account.
+```bash
+./scripts/start.sh --reset
+```
+
+Then open `http://localhost:3000` to register your first admin user.
 
 ## Database Configuration (Optional)
 

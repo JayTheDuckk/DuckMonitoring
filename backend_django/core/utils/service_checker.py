@@ -164,6 +164,37 @@ def check_http(host: str, port: int = 80, path: str = '/', timeout: int = 10,
     except Exception as e:
         return ('unknown', f'HTTP ERROR - {str(e)}', None)
 
+def _get_snmp_v3_user_data(v3_auth: Dict):
+    auth_protocols = {
+        'MD5': usmHMACMD5AuthProtocol,
+        'SHA': usmHMACSHAAuthProtocol,
+    }
+    priv_protocols = {
+        'DES': usmDESPrivProtocol,
+        'AES': usmAesCfb128Protocol,
+    }
+    
+    auth_proto = auth_protocols.get(v3_auth.get('auth_protocol', 'MD5'))
+    priv_proto = priv_protocols.get(v3_auth.get('priv_protocol', 'DES'))
+    
+    sl = v3_auth.get('security_level')
+    if sl == 'noAuthNoPriv':
+         return UsmUserData(v3_auth.get('username'))
+    elif sl == 'authNoPriv':
+         return UsmUserData(
+            v3_auth.get('username'),
+            v3_auth.get('auth_key'),
+            authProtocol=auth_proto
+        )
+    else:
+        return UsmUserData(
+            v3_auth.get('username'),
+            v3_auth.get('auth_key'),
+            v3_auth.get('priv_key'),
+            authProtocol=auth_proto,
+            privProtocol=priv_proto
+        )
+
 def check_snmp_multiple(host: str, oids: List[str], community: str = 'public',
                        snmp_version: int = 2, port: int = 161, timeout: int = 10,
                        v3_auth: Dict = None) -> Tuple[str, str, Optional[float]]:
@@ -178,32 +209,7 @@ def check_snmp_multiple(host: str, oids: List[str], community: str = 'public',
         
         # Build SNMP request based on version
         if snmp_version == 3 and v3_auth:
-            # Map auth/priv protocols
-            auth_protocols = {
-                'MD5': usmHMACMD5AuthProtocol,
-                'SHA': usmHMACSHAAuthProtocol,
-            }
-            priv_protocols = {
-                'DES': usmDESPrivProtocol,
-                'AES': usmAesCfb128Protocol,
-            }
-            
-            user_data = UsmUserData(
-                v3_auth.get('username'),
-                v3_auth.get('auth_key'),
-                v3_auth.get('priv_key'),
-                authProtocol=auth_protocols.get(v3_auth.get('auth_protocol', 'MD5')),
-                privProtocol=priv_protocols.get(v3_auth.get('priv_protocol', 'DES'))
-            )
-            
-            if v3_auth.get('security_level') == 'noAuthNoPriv':
-                 user_data = UsmUserData(v3_auth.get('username'))
-            elif v3_auth.get('security_level') == 'authNoPriv':
-                 user_data = UsmUserData(
-                    v3_auth.get('username'),
-                    v3_auth.get('auth_key'),
-                    authProtocol=auth_protocols.get(v3_auth.get('auth_protocol', 'MD5'))
-                )
+            user_data = _get_snmp_v3_user_data(v3_auth)
 
             iterator = getCmd(
                 SnmpEngine(),
@@ -411,32 +417,7 @@ def walk_snmp(host: str, oid: str, community: str = 'public',
     try:
         # Build SNMP request based on version
         if snmp_version == 3 and v3_auth:
-            # Map auth/priv protocols
-            auth_protocols = {
-                'MD5': usmHMACMD5AuthProtocol,
-                'SHA': usmHMACSHAAuthProtocol,
-            }
-            priv_protocols = {
-                'DES': usmDESPrivProtocol,
-                'AES': usmAesCfb128Protocol,
-            }
-            
-            user_data = UsmUserData(
-                v3_auth.get('username'),
-                v3_auth.get('auth_key'),
-                v3_auth.get('priv_key'),
-                authProtocol=auth_protocols.get(v3_auth.get('auth_protocol', 'MD5')),
-                privProtocol=priv_protocols.get(v3_auth.get('priv_protocol', 'DES'))
-            )
-            
-            if v3_auth.get('security_level') == 'noAuthNoPriv':
-                 user_data = UsmUserData(v3_auth.get('username'))
-            elif v3_auth.get('security_level') == 'authNoPriv':
-                 user_data = UsmUserData(
-                    v3_auth.get('username'),
-                    v3_auth.get('auth_key'),
-                    authProtocol=auth_protocols.get(v3_auth.get('auth_protocol', 'MD5'))
-                )
+            user_data = _get_snmp_v3_user_data(v3_auth)
 
             iterator = nextCmd(
                 SnmpEngine(),

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { getSetupStatus } from '../../services/api';
-import './Register.css'; // Reuse register styles
+import './Auth.css'; // Reuse register styles
 
 const Setup = () => {
     const [formData, setFormData] = useState({
@@ -72,14 +72,14 @@ const Setup = () => {
     };
 
     return (
-        <div className="register-container">
-            <div className="register-card">
-                <div className="register-header">
+        <div className="auth-container">
+            <div className="auth-card">
+                <div className="auth-header">
                     <h1>Initial Setup</h1>
                     <p>Create your Admin Account</p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="register-form">
+                <form onSubmit={handleSubmit} className="auth-form">
                     {error && <div className="error-message">{error}</div>}
 
                     <div className="form-group">
@@ -136,7 +136,7 @@ const Setup = () => {
                         />
                     </div>
 
-                    <button type="submit" className="register-button" disabled={loading}>
+                    <button type="submit" className="auth-button" disabled={loading}>
                         {loading ? 'Creating Admin...' : 'Complete Setup'}
                     </button>
                 </form>

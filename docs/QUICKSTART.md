@@ -2,91 +2,78 @@
 
 Get up and running with Duck Monitoring in minutes!
 
-## 1. Start the Application (5 minutes)
+## 1. Start Everything
 
-Duck Monitoring comes with a streamlined initial startup script that automatically creates the database, installs dependencies, and starts the frontend and backend servers.
+One script does it all — setup, Redis, backend, Celery, and frontend:
 
 ```bash
-# From the project root, run the initial setup script
-./scripts/initial_startup.sh
+./scripts/start.sh
 ```
 
-**Note:** This script is intended for first-time installation and will prompt you to confirm resetting the database.
-
-The script will:
-- Create a Python virtual environment
-- Install backend dependencies
-- Run initial database migrations
-- Install frontend dependencies
+On first run it will automatically:
+- Create a Python virtual environment and install backend dependencies
+- Run database migrations
+- Install frontend Node dependencies
+- Start Redis if it is not already running
 - Start the API on `http://localhost:8000`
 - Start the Web UI on `http://localhost:3000`
 
-## 2. Initial Browser Setup (1 minute)
+## 2. Initial Browser Setup
 
-Once the script finishes starting the servers:
+Once the script finishes:
 1. Open your browser to `http://localhost:3000`
-2. You will be automatically redirected to the **Setup** page
+2. You will be redirected to the **Setup** page
 3. Create your first administrative user account
 
-## 3. Regular Restarts
+## 3. Daily Use
 
-For regular use (after the initial setup), you can simply use the standard start and stop scripts:
 ```bash
-./scripts/start.sh
-./scripts/stop.sh
+./scripts/start.sh    # Start everything
+./scripts/stop.sh     # Stop everything
+./scripts/status.sh   # Check what's running
 ```
 
-## 4. Start an Agent (2 minutes)
+To wipe the database and start fresh:
+
+```bash
+./scripts/start.sh --reset
+```
+
+## 4. Start an Agent
 
 In another terminal:
 
 ```bash
-# Navigate to agent
 cd agent
-
-# Create virtual environment
 python3 -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Start the agent
 python agent.py --server http://localhost:8000
 ```
 
-This will start 6 test hosts (web servers, database, cache, app servers) that automatically report to your monitoring server. See [../docker/README.md](../docker/README.md) for details.
+Or use Docker test hosts — see [../docker/README.md](../docker/README.md).
 
 ## 5. View Your Dashboard
 
-Open your browser to `http://localhost:3000` and you should see:
-- Your host registered in the dashboard
-- Real-time status updates
+Open `http://localhost:3000` to see:
+- Registered hosts and real-time status
 - Service checks (CPU, Memory, Disk)
-- Historical metrics ready to graph
-
-## Next Steps
-
-- Add more agents on different machines
-- Explore the host detail pages to view graphs
-- Customize the monitoring interval with `--interval` flag
-- Configure PostgreSQL for production use
+- Historical metrics and graphs
 
 ## Troubleshooting
 
 **Backend won't start:**
 - Check if port 8000 is available
-- If port 8000 is in use, check `manage.py runserver` options
 - Verify Python 3.8+ is installed
-- Ensure all dependencies are installed
+
+**Service checks not running:**
+- Redis must be running for Celery — `./scripts/start.sh` starts it automatically if possible
+- Check Celery logs: `/tmp/duck-monitoring-celery.log`
 
 **Frontend won't connect:**
-- Verify backend is running on port 8000 (or your custom port)
+- Verify backend is running: `curl http://localhost:8000/api/health/`
 - Check browser console for errors
-- Ensure CORS is enabled (it is by default)
 
 **Agent won't register:**
 - Verify backend URL is correct
-- Check network connectivity
 - Ensure backend is running
-

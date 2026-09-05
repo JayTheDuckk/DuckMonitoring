@@ -34,7 +34,7 @@ const puppeteer = require('puppeteer');
 
             console.log("Submitting Setup Form...");
             await page.click('button[type="submit"]');
-            await page.waitForSelector('#username', { timeout: 15000 }); // Wait for redirect to /login
+            await page.waitForSelector('.login-container', { timeout: 15000 }); // Wait for redirect to /login
             console.log("Navigated after setup.");
         }
 

@@ -14,6 +14,38 @@ const SERVICE_CATEGORIES = {
 
 const getServiceCategory = (name) => SERVICE_CATEGORIES[name?.toLowerCase()] || 'other';
 
+const getVendorDisplay = (host) => {
+    if ((host.vendor_source === 'mdns_guess' || host.vendor_source === 'ssdp_guess') && host.vendor) {
+        return {
+            label: host.vendor,
+            hint: host.device_hint || 'Vendor inferred from network advertisement',
+            badgeClass: 'mac-type-mdns-guess',
+        };
+    }
+    if (!host.mac_address) {
+        return { label: host.vendor || '—', hint: host.device_hint || '', badgeClass: host.vendor ? 'mac-type-mdns-guess' : '' };
+    }
+    if (host.mac_type === 'private') {
+        return {
+            label: 'Private MAC',
+            hint: host.device_hint || 'Randomized privacy address — no manufacturer OUI',
+            badgeClass: 'mac-type-private',
+        };
+    }
+    if (host.mac_type === 'unknown') {
+        return {
+            label: host.vendor || 'Unknown',
+            hint: host.device_hint || 'Not found in IEEE OUI database',
+            badgeClass: 'mac-type-unknown',
+        };
+    }
+    return {
+        label: host.vendor || '—',
+        hint: host.device_hint || '',
+        badgeClass: 'mac-type-manufacturer',
+    };
+};
+
 const RadarIcon = () => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
@@ -200,6 +232,13 @@ const HostDiscovery = () => {
         const q = searchFilter.toLowerCase();
         return h.ip_address.includes(q) ||
             (h.hostname || '').toLowerCase().includes(q) ||
+            (h.mdns_name || '').toLowerCase().includes(q) ||
+            (h.ssdp_name || '').toLowerCase().includes(q) ||
+            (h.apple_model || '').toLowerCase().includes(q) ||
+            (h.mac_address || '').toLowerCase().includes(q) ||
+            (h.vendor || '').toLowerCase().includes(q) ||
+            (h.os_guess || '').toLowerCase().includes(q) ||
+            (h.device_class || '').toLowerCase().includes(q) ||
             (h.suggested_type || '').toLowerCase().includes(q);
     }) || [];
 
@@ -219,7 +258,7 @@ const HostDiscovery = () => {
                 </div>
                 <div>
                     <h1>Network Discovery</h1>
-                    <p>Scan your network to find devices, open ports, and services</p>
+                    <p>Scan your network to find devices, MAC addresses, open ports, and services</p>
                 </div>
             </div>
 
@@ -295,6 +334,10 @@ const HostDiscovery = () => {
                             <div className="stat-label">Hosts Found</div>
                         </div>
                         <div className="summary-stat">
+                            <div className="stat-value">{results.mdns_devices_found ?? '—'}</div>
+                            <div className="stat-label">mDNS Names</div>
+                        </div>
+                        <div className="summary-stat">
                             <div className="stat-value">{totalDetectedServices}</div>
                             <div className="stat-label">Services Detected</div>
                         </div>
@@ -368,10 +411,12 @@ const HostDiscovery = () => {
                                         <th></th>
                                         <th>Status</th>
                                         <th>IP Address</th>
-                                        <th>Hostname</th>
+                                        <th>MAC Address</th>
+                                        <th>Vendor</th>
+                                        <th>Hostname / mDNS</th>
                                         <th>Latency</th>
                                         <th>Services</th>
-                                        <th>Type</th>
+                                        <th>OS / Device</th>
                                         <th></th>
                                     </tr>
                                 </thead>
@@ -391,7 +436,34 @@ const HostDiscovery = () => {
                                                 </td>
                                                 <td><span className="host-status-dot"></span></td>
                                                 <td className="host-ip-cell">{host.ip_address}</td>
-                                                <td className="host-hostname-cell">{host.hostname || '—'}</td>
+                                                <td className="host-mac-cell">{host.mac_address || '—'}</td>
+                                                <td className="host-vendor-cell">
+                                                    {(() => {
+                                                        const v = getVendorDisplay(host);
+                                                        return (
+                                                            <span
+                                                                className={`vendor-label ${v.badgeClass}`}
+                                                                title={v.hint || undefined}
+                                                            >
+                                                                {v.label}
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                </td>
+                                                <td className="host-hostname-cell">
+                                                    {host.mdns_name ? (
+                                                        <>
+                                                            <span className="mdns-name" title={host.mdns_hostname || host.hostname}>
+                                                                {host.mdns_name}
+                                                            </span>
+                                                            {host.apple_model && (
+                                                                <span className="apple-model-label">{host.apple_model}</span>
+                                                            )}
+                                                        </>
+                                                    ) : (
+                                                        host.hostname || '—'
+                                                    )}
+                                                </td>
                                                 <td className="host-latency-cell">
                                                     {host.latency != null ? (
                                                         <span className={`latency-badge ${host.latency > 100 ? 'slow' : ''}`}>
@@ -405,9 +477,17 @@ const HostDiscovery = () => {
                                                     ) : '—'}
                                                 </td>
                                                 <td>
-                                                    <span className={`type-badge ${host.suggested_type || 'unknown'}`}>
-                                                        {host.suggested_type || 'unknown'}
+                                                    <span
+                                                        className={`os-badge confidence-${host.confidence || 'low'}`}
+                                                        title={(host.identification_clues || []).join(' · ') || host.device_hint || undefined}
+                                                    >
+                                                        {host.os_guess && host.os_guess !== 'Unknown'
+                                                            ? host.os_guess
+                                                            : (host.suggested_type || 'unknown')}
                                                     </span>
+                                                    {host.device_class && host.device_class !== 'unknown' && (
+                                                        <span className="device-class-label">{host.device_class}</span>
+                                                    )}
                                                 </td>
                                                 <td>
                                                     {host.services?.length > 0 && (
@@ -424,7 +504,7 @@ const HostDiscovery = () => {
                                             {/* Expanded services row */}
                                             {expandedHosts.has(host.ip_address) && host.services?.length > 0 && (
                                                 <tr className="services-expansion">
-                                                    <td colSpan="8">
+                                                    <td colSpan="10">
                                                         <div className="services-expansion-inner">
                                                             <div className="services-expansion-header">
                                                                 <h4>Detected Services — select to create service checks</h4>

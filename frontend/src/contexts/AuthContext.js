@@ -30,7 +30,6 @@ export const AuthProvider = ({ children }) => {
     }
   }, [token]);
 
-  // Check setup status
   const checkSetup = async () => {
     try {
       const { getSetupStatus } = require('../services/api');
@@ -39,6 +38,7 @@ export const AuthProvider = ({ children }) => {
       return response.data.is_setup;
     } catch (error) {
       console.error('Failed to check setup status:', error);
+      setIsSetup(false);
       return false;
     }
   };

@@ -81,47 +81,7 @@ def check_service(config_id):
         
         # Update host status based on service check results
         host = config.host
-        if config.check_type == 'ping':
-            # Ping is the primary indicator of host availability
-            if status == 'ok':
-                host.status = 'up'
-            elif status == 'critical':
-                host.status = 'down'
-            host.last_check = timezone.now()
-            host.save()
-        else:
-            # For other checks, determine host status from all service checks
-            # If any ping check exists and is ok, host is up
-            ping_checks = ServiceCheckConfig.objects.filter(
-                host=host,
-                check_type='ping',
-                enabled=True
-            )
-            if ping_checks.exists():
-                # Use ping check status
-                ping_status = ping_checks.first().status
-                if ping_status == 'ok':
-                    host.status = 'up'
-                elif ping_status == 'critical':
-                    host.status = 'down'
-                else:
-                    host.status = 'unknown'
-            else:
-                # No ping check, aggregate from all checks
-                all_checks = ServiceCheckConfig.objects.filter(host=host, enabled=True)
-                if all_checks.exists():
-                    # If any check is ok, host is up
-                    # If all are critical, host is down
-                    has_ok = all_checks.filter(status='ok').exists()
-                    all_critical = all_checks.exclude(status='critical').count() == 0
-                    if has_ok:
-                        host.status = 'up'
-                    elif all_critical and all_checks.count() > 0:
-                        host.status = 'down'
-                    else:
-                        host.status = 'unknown'
-            host.last_check = timezone.now()
-            host.save()
+        host.update_status()
         
     except ServiceCheckConfig.DoesNotExist:
         pass
@@ -203,8 +163,21 @@ def check_snmp_device_task(device_id):
         
         # Store metrics
         for k, v in metrics.items():
-             # Logic similar to original jobs.py
-             pass
+            if isinstance(v, (int, float)):
+                SNMPDeviceMetric.objects.create(
+                    snmp_device=device,
+                    metric_name=k,
+                    metric_type='snmp',
+                    value=v,
+                    unit=''
+                )
+            elif v is not None:
+                SNMPDeviceMetric.objects.create(
+                    snmp_device=device,
+                    metric_name=k,
+                    metric_type='snmp',
+                    value_string=str(v),
+                )
                 
     except SNMPDevice.DoesNotExist:
         pass

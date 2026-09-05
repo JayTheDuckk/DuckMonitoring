@@ -15,6 +15,14 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend_django
@@ -24,8 +32,12 @@ services:
     environment:
       - DATABASE_URL=postgres://duck_db_user:duck_db_password@db:5432/duck_monitoring
       - DJANGO_SETTINGS_MODULE=config.settings
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - ./.docker_data/backend_static:/app/static
@@ -33,6 +45,38 @@ services:
       sh -c "python manage.py migrate &&
              python manage.py collectstatic --noinput &&
              gunicorn --bind 0.0.0.0:8000 config.wsgi:application"
+
+  celery-worker:
+    build:
+      context: ./backend_django
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgres://duck_db_user:duck_db_password@db:5432/duck_monitoring
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A config worker -l info
+
+  celery-beat:
+    build:
+      context: ./backend_django
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgres://duck_db_user:duck_db_password@db:5432/duck_monitoring
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A config beat -l info
 
   frontend:
     build:

@@ -164,12 +164,6 @@ class AlertService:
         # Find existing active alert for this rule/host
         active_alert = Alert.objects.filter(
             rule=rule,
-            host=host,
-            status__ne='resolved' # Only firing or ack
-        ).first() # Django filter ne? No, exclude resolved
-        
-        active_alert = Alert.objects.filter(
-            rule=rule,
             host=host
         ).exclude(status='resolved').first()
         

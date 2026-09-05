@@ -279,6 +279,18 @@ const HostDetail = () => {
           <span className="info-label">IP Address:</span>
           <span className="info-value">{host.ip_address || 'N/A'}</span>
         </div>
+        {host.mac_address && (
+          <div className="info-item">
+            <span className="info-label">MAC Address:</span>
+            <span className="info-value">{host.mac_address}</span>
+          </div>
+        )}
+        {host.vendor && (
+          <div className="info-item">
+            <span className="info-label">Vendor:</span>
+            <span className="info-value">{host.vendor}</span>
+          </div>
+        )}
         {host.last_check && (
           <div className="info-item">
             <span className="info-label">Last Check:</span>

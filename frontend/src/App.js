@@ -2,7 +2,6 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Dashboard from './components/dashboards/Dashboard';
-import ConciseDashboard from './components/dashboards/ConciseDashboard';
 import HostDetail from './components/hosts/HostDetail';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
@@ -65,7 +64,6 @@ const Navbar = () => {
         {/* Main Navigation - Essential Items */}
         <div className="nav-menu">
           <Link to="/" className="nav-link">Dashboard</Link>
-          <Link to="/overview" className="nav-link">Overview</Link>
           <Link to="/ups" className="nav-link">UPS</Link>
           <Link to="/snmp" className="nav-link">SNMP</Link>
           <Link to="/topology" className="nav-link">Topology</Link>
@@ -193,15 +191,6 @@ const AppContent = () => {
               !isSetup ? <Navigate to="/setup" replace /> :
                 <ProtectedRoute>
                   <Dashboard />
-                </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/overview"
-            element={
-              !isSetup ? <Navigate to="/setup" replace /> :
-                <ProtectedRoute>
-                  <ConciseDashboard />
                 </ProtectedRoute>
             }
           />
