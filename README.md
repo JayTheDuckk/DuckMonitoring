@@ -4,14 +4,6 @@ A personal LAN monitoring stack: see what is on the network, keep those devices 
 
 Docker Compose is the supported way to run it. The browser talks to `http://localhost:3000`; nginx proxies `/api` and `/admin` so you do not open port 8000.
 
-![Hosts Overview](docs/images/hosts-overview.png)
-
-![Network Discovery](docs/images/discovery.png)
-
-![Alerts](docs/images/alerts.png)
-
-![Network Topology](docs/images/topology.png)
-
 ## What it does
 
 - **Hosts Overview** — lasting inventory with groups, drag-and-drop, assumed names, vendor, last seen, and open ports. Expand a row for latency, ping TTL, and watched checks.

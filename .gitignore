@@ -46,7 +46,6 @@ frontend/npm-debug.log*
 e2e_tests/node_modules/
 e2e_tests/*.png
 *.png
-!docs/images/*.png
 frontend/yarn-debug.log*
 frontend/yarn-error.log*
 
