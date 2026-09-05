@@ -213,6 +213,60 @@ class DiscoveryViewSet(viewsets.ViewSet):
             hosts.append(observation_as_host(observation, seen_this_scan=False))
         return Response({'hosts': hosts})
 
+    @action(detail=False, methods=['get'])
+    def changes(self, request):
+        """
+        Week-over-week discovery diff (default 7 days).
+
+        new: first_seen >= since
+        gone: first_seen < since (they used to be around), last_seen older than
+              max(since, now-24h), and last_seen still within 30 days
+        unnamed_mobile: device_class is privacy_device, mobile, or phone and
+                        there is no mdns_name
+        """
+        try:
+            days = int(request.query_params.get('days', 7))
+        except (TypeError, ValueError):
+            days = 7
+        days = max(1, min(days, 90))
+        network = request.query_params.get('network')
+        now = timezone.now()
+        since = now - timedelta(days=days)
+        gone_cutoff = max(since, now - timedelta(hours=24))
+        recent_floor = now - timedelta(days=30)
+        unnamed_classes = {'privacy_device', 'mobile', 'phone'}
+
+        new_hosts = []
+        gone_hosts = []
+        unnamed_mobile = []
+
+        for observation in DeviceObservation.objects.all():
+            if network and not observation_matches_network(observation, network):
+                continue
+            if not observation.first_seen or not observation.last_seen:
+                continue
+
+            host = observation_as_host(observation, seen_this_scan=False)
+            if observation.first_seen >= since:
+                new_hosts.append(host)
+            elif (
+                observation.last_seen < gone_cutoff
+                and observation.last_seen >= recent_floor
+            ):
+                gone_hosts.append(host)
+
+            device_class = (observation.device_class or host.get('device_class') or '').lower()
+            mdns_name = observation.mdns_name or host.get('mdns_name')
+            if device_class in unnamed_classes and not mdns_name:
+                unnamed_mobile.append(host)
+
+        return Response({
+            'since': since.isoformat(),
+            'new': new_hosts,
+            'gone': gone_hosts,
+            'unnamed_mobile': unnamed_mobile,
+        })
+
     @action(detail=False, methods=['post'])
     def import_hosts(self, request):
         from alerts.pack import ensure_default_alert_pack

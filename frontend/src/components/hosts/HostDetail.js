@@ -291,12 +291,25 @@ const HostDetail = () => {
             <span className="info-value">{host.vendor}</span>
           </div>
         )}
-        {host.device_class && (
+        {host.device_class === 'privacy_device' ? (
+          <div className="info-item">
+            <span className="info-label">Device Class:</span>
+            <span className="info-value">
+              Privacy device
+              {(host.privacy_reason || (Array.isArray(host.identification_clues) && host.identification_clues[0])) && (
+                <span className="privacy-reason">
+                  {' — '}
+                  {host.privacy_reason || host.identification_clues[0]}
+                </span>
+              )}
+            </span>
+          </div>
+        ) : host.device_class ? (
           <div className="info-item">
             <span className="info-label">Device Class:</span>
             <span className="info-value">{host.device_class}</span>
           </div>
-        )}
+        ) : null}
         {host.mdns_name && (
           <div className="info-item">
             <span className="info-label">mDNS Name:</span>

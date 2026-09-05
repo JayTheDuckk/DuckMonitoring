@@ -47,3 +47,41 @@ class DeviceFingerprintTests(TestCase):
             deep_probe=False,
         )
         self.assertIn(result.device_class, ('router', 'network_device', 'server'))
+
+    def test_private_mac_without_name_is_privacy_device(self):
+        result = fingerprint_device(
+            '192.168.0.80',
+            hostname=None,
+            services=[],
+            mac_type='private',
+            vendor='Private/Random MAC',
+            ping_ttl=64,
+            deep_probe=False,
+        )
+        self.assertEqual(result.device_class, 'privacy_device')
+        self.assertTrue(result.privacy_reason)
+        self.assertTrue(any('expected' in clue.lower() or 'privacy' in clue.lower()
+                            for clue in result.identification_clues))
+
+    def test_private_mac_with_name_is_not_privacy_device(self):
+        result = fingerprint_device(
+            '192.168.0.81',
+            hostname='android-abc123',
+            services=[],
+            mac_type='private',
+            deep_probe=False,
+        )
+        self.assertNotEqual(result.device_class, 'privacy_device')
+        self.assertEqual(result.os_guess, 'Android')
+
+    def test_private_mac_does_not_override_router(self):
+        result = fingerprint_device(
+            '192.168.0.1',
+            hostname=None,
+            vendor='TP-Link Systems Inc',
+            services=[{'port': 161, 'service': 'SNMP'}, {'port': 80, 'service': 'HTTP'}],
+            mac_type='private',
+            deep_probe=False,
+        )
+        self.assertIn(result.device_class, ('router', 'network_device', 'server'))
+        self.assertNotEqual(result.device_class, 'privacy_device')

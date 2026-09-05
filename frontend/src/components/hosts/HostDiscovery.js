@@ -113,7 +113,16 @@ const HostDiscovery = () => {
     const [expandedHosts, setExpandedHosts] = useState(new Set());
     const [searchFilter, setSearchFilter] = useState('');
     const [scanElapsed, setScanElapsed] = useState(0);
+    const [changes, setChanges] = useState(null);
     const timerRef = useRef(null);
+
+    const loadChanges = (networkFilter) => {
+        const params = new URLSearchParams({ days: '7' });
+        if (networkFilter) params.set('network', networkFilter);
+        return api.get(`/inventory/discovery/changes/?${params.toString()}`)
+            .then((response) => setChanges(response.data))
+            .catch(() => {});
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -124,6 +133,7 @@ const HostDiscovery = () => {
                 }
             })
             .catch(() => {});
+        loadChanges();
         return () => { cancelled = true; };
     }, []);
 
@@ -160,6 +170,7 @@ const HostDiscovery = () => {
                 scan_type: scanType
             });
             setResults(response.data);
+            loadChanges(network);
 
             // Auto-select all discovered hosts
             const allIps = new Set(response.data.hosts.map(h => h.ip_address));
@@ -354,6 +365,16 @@ const HostDiscovery = () => {
             {/* Results */}
             {results && !scanning && (
                 <div className="results-panel">
+                    {changes && (
+                        <div className="changes-strip" aria-live="polite">
+                            <span>{changes.new?.length || 0} new this week</span>
+                            <span className="changes-strip-sep" aria-hidden="true">·</span>
+                            <span>{changes.gone?.length || 0} gone</span>
+                            <span className="changes-strip-sep" aria-hidden="true">·</span>
+                            <span>{changes.unnamed_mobile?.length || 0} unnamed mobiles</span>
+                        </div>
+                    )}
+
                     {/* Summary Stats */}
                     <div className="results-summary-bar">
                         <div className="summary-stat highlight">
@@ -514,16 +535,34 @@ const HostDiscovery = () => {
                                                     ) : '—'}
                                                 </td>
                                                 <td>
-                                                    <span
-                                                        className={`os-badge confidence-${host.confidence || 'low'}`}
-                                                        title={(host.identification_clues || []).join(' · ') || host.device_hint || undefined}
-                                                    >
-                                                        {host.os_guess && host.os_guess !== 'Unknown'
-                                                            ? host.os_guess
-                                                            : (host.suggested_type || 'unknown')}
-                                                    </span>
-                                                    {host.device_class && host.device_class !== 'unknown' && (
-                                                        <span className="device-class-label">{host.device_class}</span>
+                                                    {host.device_class === 'privacy_device' ? (
+                                                        <div className="privacy-device-cell">
+                                                            <span
+                                                                className="privacy-device-label"
+                                                                title={host.privacy_reason || (host.identification_clues || []).join(' · ') || host.device_hint || undefined}
+                                                            >
+                                                                Privacy device
+                                                            </span>
+                                                            {(host.privacy_reason || host.identification_clues?.[0]) && (
+                                                                <span className="privacy-device-reason">
+                                                                    {host.privacy_reason || host.identification_clues[0]}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <span
+                                                                className={`os-badge confidence-${host.confidence || 'low'}`}
+                                                                title={(host.identification_clues || []).join(' · ') || host.device_hint || undefined}
+                                                            >
+                                                                {host.os_guess && host.os_guess !== 'Unknown'
+                                                                    ? host.os_guess
+                                                                    : (host.suggested_type || 'unknown')}
+                                                            </span>
+                                                            {host.device_class && host.device_class !== 'unknown' && (
+                                                                <span className="device-class-label">{host.device_class}</span>
+                                                            )}
+                                                        </>
                                                     )}
                                                 </td>
                                                 <td>
