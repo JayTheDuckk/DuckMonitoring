@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
-import api, { login as apiLogin, register as apiRegister, getProfile } from '../services/api';
+import api, { login as apiLogin, register as apiRegister, getProfile, getSetupStatus } from '../services/api';
 // We import named exports to use them directly or use 'api' instance for other calls
 
 const AuthContext = createContext(null);
@@ -32,7 +32,6 @@ export const AuthProvider = ({ children }) => {
 
   const checkSetup = async () => {
     try {
-      const { getSetupStatus } = require('../services/api');
       const response = await getSetupStatus();
       setIsSetup(response.data.is_setup);
       return response.data.is_setup;
