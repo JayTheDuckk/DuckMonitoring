@@ -11,6 +11,7 @@ never match a manufacturer OUI.
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -49,12 +50,25 @@ def normalize_mac(mac: str) -> Optional[str]:
         return None
     cleaned = mac.strip().replace('-', ':').upper()
     parts = cleaned.split(':')
-    if len(parts) == 6 and all(len(p) == 2 for p in parts):
-        return cleaned
+    if len(parts) == 6 and all(1 <= len(p) <= 2 for p in parts):
+        try:
+            return ':'.join(f'{int(p, 16):02X}' for p in parts)
+        except ValueError:
+            return None
     hex_only = ''.join(c for c in cleaned if c in '0123456789ABCDEF')
     if len(hex_only) == 12:
         return ':'.join(hex_only[i:i + 2] for i in range(0, 12, 2))
     return None
+
+
+def parse_mac_from_text(text: str) -> Optional[str]:
+    """Extract and normalize a MAC address from command output or logs."""
+    if not text or '(incomplete)' in text.lower():
+        return None
+    match = re.search(r'([0-9A-Fa-f]{1,2}[:-]){5}([0-9A-Fa-f]{1,2})', text)
+    if not match:
+        return None
+    return normalize_mac(match.group(0))
 
 
 def is_multicast_mac(mac: str) -> bool:

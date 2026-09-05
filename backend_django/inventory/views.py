@@ -171,7 +171,7 @@ class DiscoveryViewSet(viewsets.ViewSet):
                 'hostname': hostname,
                 'status': 'up',
                 'mac_address': host_data.get('mac_address'),
-                'vendor': host_data.get('vendor') if host_data.get('mac_type') == 'manufacturer' else None,
+                'vendor': host_data.get('vendor') if host_data.get('mac_type') == 'manufacturer' or host_data.get('vendor_source') in ('mdns_guess', 'ssdp_guess') else None,
             }
             
             host, created = Host.objects.update_or_create(

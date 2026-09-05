@@ -252,7 +252,7 @@ def _score_from_mac(mac_type: Optional[str], vendor: Optional[str]) -> List[Fing
     vendor_l = (vendor or '').lower()
 
     if mac_type == 'private':
-        scores.append(FingerprintScore('Mobile/Desktop', 'mobile', 4, 'Private/random MAC — typical of phone, tablet, or laptop'))
+        scores.append(FingerprintScore('iOS/Android/macOS', 'mobile', 5, 'Privacy MAC with no open ports — often a phone or tablet with inbound firewall'))
 
     vendor_map = [
         ('apple', 'macOS/iOS', 'mobile', 7, 'Apple network hardware'),
@@ -277,7 +277,7 @@ def _score_from_ttl(ttl: Optional[int]) -> List[FingerprintScore]:
     if ttl is None:
         return []
     if ttl <= 64:
-        return [FingerprintScore('Linux/Unix/macOS', 'unknown', 3, f'Ping TTL {ttl} (typical for Linux/macOS/network gear)')]
+        return [FingerprintScore('Linux/Unix/macOS/iOS/Android', 'mobile', 4, f'Ping TTL {ttl} (typical for Unix-like/mobile OS)')]
     if ttl <= 128:
         return [FingerprintScore('Windows', 'desktop', 4, f'Ping TTL {ttl} (typical for Windows)')]
     return [FingerprintScore('Network Device', 'router', 3, f'Ping TTL {ttl} (typical for routers)')]

@@ -15,8 +15,15 @@ const SERVICE_CATEGORIES = {
 const getServiceCategory = (name) => SERVICE_CATEGORIES[name?.toLowerCase()] || 'other';
 
 const getVendorDisplay = (host) => {
+    if ((host.vendor_source === 'mdns_guess' || host.vendor_source === 'ssdp_guess') && host.vendor) {
+        return {
+            label: host.vendor,
+            hint: host.device_hint || 'Vendor inferred from network advertisement',
+            badgeClass: 'mac-type-mdns-guess',
+        };
+    }
     if (!host.mac_address) {
-        return { label: '—', hint: '', badgeClass: '' };
+        return { label: host.vendor || '—', hint: host.device_hint || '', badgeClass: host.vendor ? 'mac-type-mdns-guess' : '' };
     }
     if (host.mac_type === 'private') {
         return {
@@ -226,6 +233,7 @@ const HostDiscovery = () => {
         return h.ip_address.includes(q) ||
             (h.hostname || '').toLowerCase().includes(q) ||
             (h.mdns_name || '').toLowerCase().includes(q) ||
+            (h.ssdp_name || '').toLowerCase().includes(q) ||
             (h.apple_model || '').toLowerCase().includes(q) ||
             (h.mac_address || '').toLowerCase().includes(q) ||
             (h.vendor || '').toLowerCase().includes(q) ||

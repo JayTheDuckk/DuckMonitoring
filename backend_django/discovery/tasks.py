@@ -47,11 +47,11 @@ def scan_network_task(scan_id):
         scan.save()
 
         arp_hosts = get_active_hosts_from_arp()
-        mdns_map = discover_mdns_hosts(timeout=5.0)
+        mdns_result = discover_mdns_hosts(timeout=8.0)
 
         for ip in ips_list:
             scan.scanned_hosts += 1
-            host_info = discover_host(ip, scan_ports=True, known_mac=arp_hosts.get(ip), mdns_map=mdns_map)
+            host_info = discover_host(ip, scan_ports=True, known_mac=arp_hosts.get(ip), mdns_result=mdns_result)
 
             if host_info:
                 research = research_mac(

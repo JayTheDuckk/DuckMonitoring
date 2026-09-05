@@ -498,6 +498,13 @@
     color: var(--text-primary);
 }
 
+.vendor-label.mac-type-mdns-guess {
+    color: #6366f1;
+    font-weight: 600;
+    cursor: help;
+    border-bottom: 1px dotted #6366f1;
+}
+
 .host-hostname-cell {
     color: var(--text-secondary);
 }

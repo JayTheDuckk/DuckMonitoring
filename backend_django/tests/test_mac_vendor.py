@@ -4,6 +4,7 @@ from core.utils.mac_vendor import (
     is_locally_administered_mac,
     lookup_vendor,
     normalize_mac,
+    parse_mac_from_text,
     research_mac,
 )
 
@@ -12,6 +13,14 @@ class MacVendorLookupTests(TestCase):
     def test_normalize_mac(self):
         self.assertEqual(normalize_mac('48-22-54-32-ba-18'), '48:22:54:32:BA:18')
         self.assertEqual(normalize_mac('48225432ba18'), '48:22:54:32:BA:18')
+
+    def test_normalize_mac_single_digit_octets(self):
+        self.assertEqual(normalize_mac('ec:2b:eb:3f:c:12'), 'EC:2B:EB:3F:0C:12')
+
+    def test_parse_mac_from_text(self):
+        line = '? (192.168.0.239) at ec:2b:eb:3f:c:12 on en0 ifscope [ethernet]'
+        self.assertEqual(parse_mac_from_text(line), 'EC:2B:EB:3F:0C:12')
+        self.assertIsNone(parse_mac_from_text('? (192.168.0.68) at (incomplete) on en0'))
 
     def test_lookup_known_vendors(self):
         self.assertEqual(lookup_vendor('00:0C:29:12:34:56'), 'VMware, Inc.')
