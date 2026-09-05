@@ -276,6 +276,46 @@
     box-shadow: var(--shadow-sm);
 }
 
+.changes-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.5rem;
+    padding: 0.65rem 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.changes-strip-sep {
+    color: var(--text-secondary);
+    opacity: 0.55;
+}
+
+.privacy-device-cell {
+    max-width: 260px;
+}
+
+.privacy-device-label {
+    display: inline-block;
+    padding: 0.2rem 0.55rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: rgba(100, 116, 139, 0.14);
+    color: var(--text-secondary);
+}
+
+.privacy-device-reason {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    margin-top: 0.2rem;
+    line-height: 1.35;
+}
+
 /* Summary Stats Bar */
 .results-summary-bar {
     display: flex;

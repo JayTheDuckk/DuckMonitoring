@@ -14,7 +14,12 @@ from typing import List, Dict, Optional, Tuple
 
 from core.utils.mac_vendor import parse_mac_from_text, research_mac
 from core.utils.device_fingerprint import fingerprint_device, FINGERPRINT_PORTS
-from core.utils.quiet_host_probe import deep_probe_quiet_host, describe_quiet_host, is_sparse_host
+from core.utils.quiet_host_probe import (
+    deep_probe_quiet_host,
+    describe_quiet_host,
+    is_sparse_host,
+    stamp_privacy_device,
+)
 from core.utils.ssdp_resolver import discover_ssdp_hosts, guess_vendor_from_ssdp
 from core.utils.mdns_resolver import (
     MdnsDiscoveryResult,
@@ -407,7 +412,10 @@ def perform_discovery(network: str, scan_ports: bool = True, max_workers: int = 
                 _enrich_sparse_host(host_info, ssdp_map, scan_ports=True)
             elif host_info['ip_address'] in ssdp_map:
                 _apply_ssdp_record(host_info, ssdp_map[host_info['ip_address']])
-                
+
+    for host_info in discovered:
+        stamp_privacy_device(host_info)
+
     return {'hosts': discovered, 'mdns_devices_found': mdns_result.device_count()}
 
 def get_mac_address(ip: str, probe_ports: Optional[List[int]] = None) -> Optional[str]:

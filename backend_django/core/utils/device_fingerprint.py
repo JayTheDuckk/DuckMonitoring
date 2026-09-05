@@ -12,6 +12,8 @@ import socket
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
+from core.utils.quiet_host_probe import stamp_privacy_device
+
 
 FINGERPRINT_PORTS = {
     22: 'SSH',
@@ -49,15 +51,19 @@ class DeviceFingerprint:
     confidence: str = 'low'
     suggested_type: str = 'unknown'
     identification_clues: List[str] = field(default_factory=list)
+    privacy_reason: Optional[str] = None
 
     def to_dict(self) -> Dict:
-        return {
+        data = {
             'os_guess': self.os_guess,
             'device_class': self.device_class,
             'confidence': self.confidence,
             'suggested_type': self.suggested_type,
             'identification_clues': self.identification_clues,
         }
+        if self.privacy_reason:
+            data['privacy_reason'] = self.privacy_reason
+        return data
 
 
 def _read_banner(ip: str, port: int, timeout: float = 1.0, probe: bytes = b'') -> Optional[str]:
@@ -349,6 +355,8 @@ def _to_suggested_type(os_name: str, device_class: str) -> str:
         return 'workstation'
     if device_class == 'iot':
         return 'iot_device'
+    if device_class == 'privacy_device':
+        return 'privacy_device'
     return 'unknown'
 
 
@@ -380,4 +388,19 @@ def fingerprint_device(
         probes = collect_probe_data(ip, list(open_ports))
         scores.extend(_score_from_banners(probes))
 
-    return _pick_best(scores)
+    result = _pick_best(scores)
+    stamped = stamp_privacy_device({
+        'device_class': result.device_class,
+        'mac_type': mac_type,
+        'hostname': hostname,
+        'mdns_name': (mdns or {}).get('friendly_name'),
+        'services': services,
+        'ping_ttl': ping_ttl,
+        'identification_clues': list(result.identification_clues),
+        'suggested_type': result.suggested_type,
+    })
+    result.device_class = stamped['device_class']
+    result.suggested_type = stamped.get('suggested_type') or result.suggested_type
+    result.identification_clues = stamped.get('identification_clues') or result.identification_clues
+    result.privacy_reason = stamped.get('privacy_reason')
+    return result
