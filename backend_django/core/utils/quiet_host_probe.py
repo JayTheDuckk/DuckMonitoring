@@ -80,7 +80,7 @@ def describe_quiet_host(host_info: Dict) -> str:
         parts.append('Uses a privacy/random MAC')
     if ttl is not None:
         if ttl <= 64:
-            parts.append(f'Responds to ping (TTL {ttl}, typical of Linux/macOS/iOS/Android)')
+            parts.append(f'Responds to ping (TTL {ttl} — Unix-like; not enough to tell Linux from macOS or Android)')
         elif ttl <= 128:
             parts.append(f'Responds to ping (TTL {ttl}, typical of Windows)')
         else:

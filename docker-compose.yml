@@ -45,6 +45,7 @@ services:
       dockerfile: Dockerfile
     environment:
       <<: *backend-env
+      LAN_IDENTITY_PATH: /app/data/lan/identity.json
     depends_on:
       db:
         condition: service_healthy
@@ -53,6 +54,7 @@ services:
     volumes:
       - backend_static:/app/static
       - backend_data:/app/data
+      - ./data/lan:/app/data/lan
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/', timeout=5)"]
       interval: 10s
@@ -69,6 +71,7 @@ services:
     environment:
       <<: *backend-env
       RUN_MIGRATIONS: "0"
+      LAN_IDENTITY_PATH: /app/data/lan/identity.json
     depends_on:
       db:
         condition: service_healthy
@@ -76,6 +79,7 @@ services:
         condition: service_healthy
     volumes:
       - backend_data:/app/data
+      - ./data/lan:/app/data/lan
     command: celery -A config worker -l info
     restart: unless-stopped
 

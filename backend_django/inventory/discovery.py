@@ -2,12 +2,15 @@
 Network Discovery Utility
 """
 
+import json
+import os
 import socket
 import subprocess
 import ipaddress
 import concurrent.futures
 import time
 from datetime import datetime
+from pathlib import Path
 import platform
 import re
 from typing import List, Dict, Optional, Tuple
@@ -120,6 +123,84 @@ def check_tcp_liveness(ip: str) -> bool:
             return True
     return False
 
+def _lan_identity_paths() -> List[Path]:
+    raw = (os.environ.get('LAN_IDENTITY_PATH') or '').strip()
+    paths = []
+    if raw:
+        paths.append(Path(raw))
+    paths.append(Path('/app/data/lan/identity.json'))
+    here = Path(__file__).resolve()
+    paths.append(here.parents[2] / 'data' / 'lan' / 'identity.json')
+    paths.append(here.parent / 'data' / 'lan' / 'identity.json')
+    return paths
+
+
+def apply_lan_identity_to_host(host_info: Dict, cache: Optional[Dict[str, dict]] = None) -> Dict:
+    """Fill empty MAC / vendor / name fields from the host identity cache."""
+    if not host_info:
+        return host_info
+    cache = cache if cache is not None else load_lan_identity_cache()
+    cached = cache.get(host_info.get('ip_address') or '') or {}
+    if not cached:
+        return host_info
+    if not host_info.get('mac_address') and cached.get('mac_address'):
+        host_info['mac_address'] = cached['mac_address']
+    hostname = _usable_name(host_info.get('hostname'))
+    cached_host = _usable_name(cached.get('hostname')) or _usable_name(cached.get('mdns_hostname'))
+    if not hostname and cached_host:
+        host_info['hostname'] = cached_host
+    cached_mdns = _usable_name(cached.get('mdns_name'))
+    if not _usable_name(host_info.get('mdns_name')) and cached_mdns:
+        host_info['mdns_name'] = cached_mdns
+    if not host_info.get('apple_model') and cached.get('apple_model'):
+        host_info['apple_model'] = cached['apple_model']
+    return host_info
+
+
+def load_lan_identity_cache() -> Dict[str, dict]:
+    """
+    Identity written by the host-side collector (data/lan/identity.json).
+
+    Docker Desktop on macOS cannot see LAN ARP/mDNS from the container.
+    The host helper publishes MACs and names for the scanner to use.
+    """
+    for path in _lan_identity_paths():
+        try:
+            if not path.is_file():
+                continue
+            data = json.loads(path.read_text())
+        except (OSError, ValueError, TypeError):
+            continue
+        hosts = data.get('hosts', data) if isinstance(data, dict) else None
+        if isinstance(hosts, dict):
+            return {
+                ip: info for ip, info in hosts.items()
+                if isinstance(info, dict)
+            }
+    return {}
+
+
+def _usable_name(value) -> Optional[str]:
+    if not value or not isinstance(value, str):
+        return None
+    name = value.strip().rstrip('.')
+    if not name or name in {'?', '*'}:
+        return None
+    return name
+
+
+def _usable_lan_ip(ip: str) -> bool:
+    if not ip or ip in ('0.0.0.0', '255.255.255.255'):
+        return False
+    if ip.endswith('.255'):
+        return False
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    return not (addr.is_loopback or addr.is_multicast or addr.is_unspecified or addr.is_reserved)
+
+
 def get_active_hosts_from_arp() -> Dict[str, str]:
     """
     Parse local ARP table to find active hosts.
@@ -130,7 +211,7 @@ def get_active_hosts_from_arp() -> Dict[str, str]:
         if platform.system().lower() == 'windows':
             cmd = ['arp', '-a']
         else:
-            cmd = ['arp', '-a'] # Mac/Linux usually supports -a too
+            cmd = ['arp', '-an']
             
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
         
@@ -138,7 +219,6 @@ def get_active_hosts_from_arp() -> Dict[str, str]:
         # Mac/Linux: ? (192.168.1.1) at 00:11:22:33:44:55 on en0 ...
         # Windows: 192.168.1.1       00-11-22-33-44-55     dynamic
         
-        import re
         ip_regex = re.compile(r'\b(?:\d{1,3}\.){3}\d{1,3}\b')
         
         for line in result.stdout.splitlines():
@@ -150,10 +230,15 @@ def get_active_hosts_from_arp() -> Dict[str, str]:
             mac = parse_mac_from_text(line)
             if ip_match and mac:
                 ip = ip_match.group(0)
-                if ip != '0.0.0.0' and not ip.endswith('.255'):
+                if _usable_lan_ip(ip):
                     active_hosts[ip] = mac
-    except:
+    except Exception:
         pass
+
+    for ip, info in load_lan_identity_cache().items():
+        mac = info.get('mac_address')
+        if mac and _usable_lan_ip(ip) and ip not in active_hosts:
+            active_hosts[ip] = mac
     return active_hosts
 
 def discover_host(
@@ -161,6 +246,7 @@ def discover_host(
     scan_ports: bool = True,
     known_mac: str = None,
     mdns_result: Optional[MdnsDiscoveryResult] = None,
+    identity_cache: Optional[Dict[str, dict]] = None,
 ) -> Optional[Dict]:
     ping_alive, latency, ping_ttl = ping_host(ip, timeout=2 if scan_ports else 1)
     if known_mac:
@@ -176,17 +262,26 @@ def discover_host(
             else:
                 return None
 
+    cached = (identity_cache or {}).get(ip) or {}
+    known_mac = known_mac or cached.get('mac_address')
+
     host_info = {
         'ip_address': ip,
         'status': 'up',
         'latency_ms': latency if latency else None,
         'latency': latency if latency else None,
         'ping_ttl': ping_ttl,
-        'hostname': get_hostname(ip),
+        'hostname': get_hostname(ip) or _usable_name(cached.get('hostname')) or _usable_name(cached.get('mdns_name')),
         'services': [],
         'suggested_type': 'unknown',
         'mac_address': known_mac,
     }
+    cached_mdns = _usable_name(cached.get('mdns_name'))
+    if cached_mdns:
+        host_info['mdns_name'] = cached_mdns
+    cached_mdns_host = _usable_name(cached.get('mdns_hostname'))
+    if cached_mdns_host and not host_info.get('hostname'):
+        host_info['hostname'] = cached_mdns_host
 
     if scan_ports:
         host_info['services'] = scan_host_ports(ip)
@@ -384,6 +479,7 @@ def perform_discovery(network: str, scan_ports: bool = True, max_workers: int = 
     except ValueError as e:
         return {'error': str(e)}
         
+    identity_cache = load_lan_identity_cache()
     arp_hosts = get_active_hosts_from_arp()
     mdns_result = discover_mdns_hosts(timeout=8.0 if scan_ports else 5.0)
     ssdp_map = discover_ssdp_hosts(timeout=4.0 if scan_ports else 2.0)
@@ -391,7 +487,14 @@ def perform_discovery(network: str, scan_ports: bool = True, max_workers: int = 
     discovered = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_ip = {
-            executor.submit(discover_host, ip, scan_ports, arp_hosts.get(ip), mdns_result): ip 
+            executor.submit(
+                discover_host,
+                ip,
+                scan_ports,
+                arp_hosts.get(ip),
+                mdns_result,
+                identity_cache,
+            ): ip
             for ip in ips_list
         }
         for future in concurrent.futures.as_completed(future_to_ip):

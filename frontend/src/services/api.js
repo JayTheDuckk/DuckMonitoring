@@ -96,10 +96,14 @@ export const deleteUser = (userId) => api.delete(`/auth/users/${userId}/`);
 
 // --- Inventory (Hosts) ---
 export const getHosts = () => api.get('/inventory/hosts/');
+export const getDiscoveryChanges = (params = {}) => api.get('/inventory/discovery/changes/', { params });
 export const getHost = (hostId) => api.get(`/inventory/hosts/${hostId}/`);
 export const createHost = (hostData) => api.post('/inventory/hosts/', hostData);
 export const updateHost = (hostId, hostData) => api.patch(`/inventory/hosts/${hostId}/`, hostData);
 export const deleteHost = (hostId) => api.delete(`/inventory/hosts/${hostId}/`);
+export const clearUngroupedHosts = () => api.post('/inventory/hosts/clear-ungrouped/');
+export const getLanWatch = () => api.get('/inventory/watch/');
+export const updateLanWatch = (data) => api.patch('/inventory/watch/', data);
 export const clearHostHistory = (hostId) => api.delete(`/inventory/hosts/${hostId}/clear-history/`);
 export const scanHostPorts = (hostId) => api.post(`/inventory/hosts/${hostId}/scan_ports/`);
 

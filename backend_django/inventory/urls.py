@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     HostViewSet, HostGroupViewSet, 
     UPSDeviceViewSet, SNMPDeviceViewSet, 
-    DiscoveryViewSet
+    DiscoveryViewSet, LanWatchView,
 )
 
 router = DefaultRouter()
@@ -14,5 +14,6 @@ router.register(r'snmp', SNMPDeviceViewSet)
 router.register(r'discovery', DiscoveryViewSet, basename='discovery')
 
 urlpatterns = [
+    path('watch/', LanWatchView.as_view(), name='lan-watch'),
     path('', include(router.urls)),
 ]

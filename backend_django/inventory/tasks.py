@@ -16,6 +16,14 @@ def _resolve_passive_network():
     if env_net:
         return env_net
 
+    try:
+        from inventory.models import LanWatchSettings
+        watch_net = (LanWatchSettings.load().network or '').strip()
+        if watch_net:
+            return watch_net
+    except Exception:
+        pass
+
     networks = (
         DeviceObservation.objects.exclude(last_network__isnull=True)
         .exclude(last_network='')
@@ -29,6 +37,9 @@ def _resolve_passive_network():
 @shared_task(name='inventory.tasks.passive_collect')
 def passive_collect():
     from core.utils.passive_collector import collect_passive_hosts
+    from inventory.discovery import apply_lan_identity_to_host, load_lan_identity_cache
+    from inventory.models import LanWatchSettings
+    from inventory.watch import sync_hosts_from_observations
 
     network = _resolve_passive_network()
     try:
@@ -37,9 +48,11 @@ def passive_collect():
         logger.warning('passive_collect failed: %s', exc)
         return 0
 
+    lan_cache = load_lan_identity_cache()
     count = 0
     for host_info in hosts:
         try:
+            apply_lan_identity_to_host(host_info, lan_cache)
             upsert_observation(host_info, network)
             count += 1
         except Exception as exc:
@@ -48,6 +61,18 @@ def passive_collect():
                 host_info.get('ip_address'),
                 exc,
             )
+
+    try:
+        settings = LanWatchSettings.load()
+        added = sync_hosts_from_observations(
+            create_missing=settings.auto_add_hosts,
+            network=settings.network or network,
+        )
+        if added:
+            logger.info('LAN watch added %s new host(s)', added)
+    except Exception as exc:
+        logger.warning('LAN watch sync failed: %s', exc)
+
     return count
 
 

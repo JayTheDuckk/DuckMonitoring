@@ -77,6 +77,22 @@ def apply_host_identity(host, host_info, now=None, *, created=False):
     if incoming_class:
         host.device_class = incoming_class
 
+    incoming_os = _nonempty(host_info.get('os_guess'))
+    if incoming_os:
+        from core.utils.device_fingerprint import is_specific_os
+        if is_specific_os(incoming_os):
+            host.os_guess = incoming_os
+        elif not is_specific_os(host.os_guess):
+            host.os_guess = None
+
+    incoming_mac = _nonempty(host_info.get('mac_address'))
+    if incoming_mac:
+        host.mac_address = incoming_mac
+
+    incoming_vendor = _nonempty(host_info.get('vendor'))
+    if incoming_vendor:
+        host.vendor = incoming_vendor
+
     confidence = normalize_confidence(host_info.get('confidence'))
     if confidence is not None:
         host.confidence = confidence
@@ -84,6 +100,10 @@ def apply_host_identity(host, host_info, now=None, *, created=False):
     clues = host_info.get('identification_clues')
     if clues:
         host.identification_clues = clues
+
+    services = host_info.get('services')
+    if services:
+        host.discovered_services = services
 
     if not host.first_seen:
         host.first_seen = now
@@ -106,6 +126,67 @@ def observation_matches_network(observation, network):
         return False
 
 
+IDENTITY_KEYS = (
+    'mac_address',
+    'hostname',
+    'mdns_name',
+    'mdns_hostname',
+    'apple_model',
+    'vendor',
+    'vendor_source',
+    'mac_type',
+    'device_hint',
+    'os_guess',
+)
+
+
+def merge_identity_payload(incoming, previous):
+    previous = previous or {}
+    incoming = incoming or {}
+    merged = dict(previous)
+    merged.update(incoming)
+    for key in IDENTITY_KEYS:
+        if not _nonempty(incoming.get(key)) and _nonempty(previous.get(key)):
+            merged[key] = previous[key]
+    return merged
+
+
+def apply_observation_identity(host_info, observation, *, seen_this_scan=True):
+    """Fill empty identity fields on a live scan host from the stored observation."""
+    if not observation or not host_info:
+        return host_info
+    known = observation_as_host(observation, seen_this_scan=seen_this_scan)
+    for key in IDENTITY_KEYS:
+        if not _nonempty(host_info.get(key)) and _nonempty(known.get(key)):
+            host_info[key] = known[key]
+    if not host_info.get('identification_clues') and known.get('identification_clues'):
+        host_info['identification_clues'] = known['identification_clues']
+    if host_info.get('confidence') in (None, '') and known.get('confidence') is not None:
+        host_info['confidence'] = known['confidence']
+    host_info['first_seen'] = known.get('first_seen')
+    host_info['last_seen'] = known.get('last_seen')
+    host_info['seen_this_scan'] = seen_this_scan
+    return host_info
+
+
+def apply_imported_host_identity(host_info, host):
+    """Fill empty identity fields from an already-imported Host row."""
+    if not host or not host_info:
+        return host_info
+    if not _nonempty(host_info.get('mac_address')) and host.mac_address:
+        host_info['mac_address'] = host.mac_address
+    if not _nonempty(host_info.get('vendor')) and host.vendor:
+        host_info['vendor'] = host.vendor
+    if not _nonempty(host_info.get('mdns_name')) and host.mdns_name:
+        host_info['mdns_name'] = host.mdns_name
+    if not _nonempty(host_info.get('apple_model')) and host.apple_model:
+        host_info['apple_model'] = host.apple_model
+    hostname = _nonempty(host.hostname)
+    if hostname and hostname != host.ip_address and not _nonempty(host_info.get('hostname')):
+        host_info['hostname'] = hostname
+    return host_info
+
+
 def observation_as_host(observation, seen_this_scan=False):
     payload = dict(observation.last_payload or {})
     payload['ip_address'] = observation.ip_address
@@ -114,6 +195,7 @@ def observation_as_host(observation, seen_this_scan=False):
     payload['mdns_name'] = observation.mdns_name or payload.get('mdns_name')
     payload['apple_model'] = observation.apple_model or payload.get('apple_model')
     payload['device_class'] = observation.device_class or payload.get('device_class')
+    payload['os_guess'] = observation.os_guess or payload.get('os_guess')
     payload['vendor'] = observation.vendor or payload.get('vendor')
     payload['vendor_source'] = observation.vendor_source or payload.get('vendor_source')
     if observation.identification_clues:
@@ -148,13 +230,23 @@ def upsert_observation(host_info, network, now=None):
     observation.mdns_name = _prefer(host_info.get('mdns_name'), observation.mdns_name)
     observation.apple_model = _prefer(host_info.get('apple_model'), observation.apple_model)
     observation.device_class = _prefer(host_info.get('device_class'), observation.device_class)
+    incoming_os = _nonempty(host_info.get('os_guess'))
+    if incoming_os:
+        from core.utils.device_fingerprint import is_specific_os
+        if is_specific_os(incoming_os):
+            observation.os_guess = incoming_os
+        elif not is_specific_os(observation.os_guess):
+            observation.os_guess = None
     observation.confidence = _richer_confidence(host_info.get('confidence'), observation.confidence)
     clues = host_info.get('identification_clues')
     if clues:
         observation.identification_clues = clues
     observation.vendor = _prefer(host_info.get('vendor'), observation.vendor)
     observation.vendor_source = _prefer(host_info.get('vendor_source'), observation.vendor_source)
-    observation.last_payload = dict(host_info)
+    observation.last_payload = merge_identity_payload(host_info, observation.last_payload)
+    for key in IDENTITY_KEYS:
+        if not _nonempty(host_info.get(key)) and _nonempty(observation.last_payload.get(key)):
+            host_info[key] = observation.last_payload[key]
     if not observation.first_seen:
         observation.first_seen = now
     observation.last_seen = now
@@ -188,8 +280,10 @@ class Host(models.Model):
     mdns_name = models.CharField(max_length=255, blank=True, null=True)
     apple_model = models.CharField(max_length=255, blank=True, null=True)
     device_class = models.CharField(max_length=64, blank=True, null=True)
+    os_guess = models.CharField(max_length=64, blank=True, null=True)
     confidence = models.IntegerField(null=True, blank=True)
     identification_clues = models.JSONField(default=list, blank=True)
+    discovered_services = models.JSONField(default=list, blank=True)
     first_seen = models.DateTimeField(null=True, blank=True)
     last_seen = models.DateTimeField(null=True, blank=True)
     agent_id = models.CharField(max_length=255, unique=True, blank=True, null=True, db_index=True)
@@ -244,6 +338,7 @@ class DeviceObservation(models.Model):
     mdns_name = models.CharField(max_length=255, blank=True, null=True)
     apple_model = models.CharField(max_length=255, blank=True, null=True)
     device_class = models.CharField(max_length=64, blank=True, null=True)
+    os_guess = models.CharField(max_length=64, blank=True, null=True)
     confidence = models.IntegerField(null=True, blank=True)
     identification_clues = models.JSONField(default=list, blank=True)
     vendor = models.CharField(max_length=255, blank=True, null=True)
@@ -261,6 +356,22 @@ class DeviceObservation(models.Model):
 
     def __str__(self):
         return self.ip_address
+
+
+class LanWatchSettings(models.Model):
+    """Singleton: auto-add newly seen LAN devices to Ungrouped hosts."""
+
+    auto_add_hosts = models.BooleanField(default=False)
+    network = models.CharField(max_length=64, blank=True, default='')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return 'LAN watch settings'
 
 
 class UPSDevice(models.Model):

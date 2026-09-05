@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
+import { CheckIcon, ChevronIcon, ScanIcon, SearchIcon, WarnIcon } from '../common/Icons';
 import './HostDiscovery.css';
 
 const SERVICE_CATEGORIES = {
@@ -14,6 +15,10 @@ const SERVICE_CATEGORIES = {
 
 const getServiceCategory = (name) => SERVICE_CATEGORIES[name?.toLowerCase()] || 'other';
 
+const SPECIFIC_OS = new Set(['Windows', 'macOS', 'iOS', 'tvOS', 'Android', 'Linux', 'Embedded Linux']);
+
+const displayOs = (host) => (SPECIFIC_OS.has(host.os_guess) ? host.os_guess : '');
+
 const getVendorDisplay = (host) => {
     if ((host.vendor_source === 'mdns_guess' || host.vendor_source === 'ssdp_guess') && host.vendor) {
         return {
@@ -23,24 +28,24 @@ const getVendorDisplay = (host) => {
         };
     }
     if (!host.mac_address) {
-        return { label: host.vendor || '—', hint: host.device_hint || '', badgeClass: host.vendor ? 'mac-type-mdns-guess' : '' };
+        return { label: host.vendor || '', hint: host.device_hint || '', badgeClass: host.vendor ? 'mac-type-mdns-guess' : '' };
     }
-    if (host.mac_type === 'private') {
+    if (host.mac_type === 'private' || /private|random/i.test(host.vendor || '')) {
         return {
-            label: 'Private MAC',
+            label: '',
             hint: host.device_hint || 'Randomized privacy address — no manufacturer OUI',
-            badgeClass: 'mac-type-private',
+            badgeClass: '',
         };
     }
-    if (host.mac_type === 'unknown') {
+    if (host.mac_type === 'unknown' || /unknown/i.test(host.vendor || '')) {
         return {
-            label: host.vendor || 'Unknown',
+            label: '',
             hint: host.device_hint || 'Not found in IEEE OUI database',
-            badgeClass: 'mac-type-unknown',
+            badgeClass: '',
         };
     }
     return {
-        label: host.vendor || '—',
+        label: host.vendor || '',
         hint: host.device_hint || '',
         badgeClass: 'mac-type-manufacturer',
     };
@@ -61,42 +66,6 @@ const formatLastSeen = (value) => {
     return date.toLocaleString();
 };
 
-const RadarIcon = () => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10" />
-        <circle cx="12" cy="12" r="6" />
-        <circle cx="12" cy="12" r="2" />
-        <line x1="12" y1="2" x2="12" y2="6" />
-    </svg>
-);
-
-const ChevronDown = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="6 9 12 15 18 9" />
-    </svg>
-);
-
-const CheckCircle = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-        <polyline points="22 4 12 14.01 9 11.01" />
-    </svg>
-);
-
-const AlertCircle = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10" />
-        <line x1="12" y1="8" x2="12" y2="12" />
-        <line x1="12" y1="16" x2="12.01" y2="16" />
-    </svg>
-);
-
-const SearchIcon = () => (
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="11" cy="11" r="8" />
-        <line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-);
 
 const HostDiscovery = () => {
     const { user } = useAuth();
@@ -114,6 +83,8 @@ const HostDiscovery = () => {
     const [searchFilter, setSearchFilter] = useState('');
     const [scanElapsed, setScanElapsed] = useState(0);
     const [changes, setChanges] = useState(null);
+    const [sortKey, setSortKey] = useState('ip');
+    const [sortDir, setSortDir] = useState('asc');
     const timerRef = useRef(null);
 
     const loadChanges = (networkFilter) => {
@@ -265,7 +236,46 @@ const HostDiscovery = () => {
     };
 
     // Computed values
-    const filteredHosts = results?.hosts?.filter(h => {
+    const ipToSortValue = (ip) => {
+        if (!ip) return null;
+        const parts = String(ip).split('.');
+        if (parts.length === 4 && parts.every((part) => /^\d+$/.test(part))) {
+            return parts.reduce((acc, part) => acc * 256 + Number(part), 0);
+        }
+        return String(ip).toLowerCase();
+    };
+
+    const discoverySortValue = (host, key) => {
+        switch (key) {
+            case 'ip':
+                return ipToSortValue(host.ip_address);
+            case 'mac':
+                return (host.mac_address || '').replace(/[:-]/g, '').toLowerCase();
+            case 'vendor':
+                return (host.vendor || '').toLowerCase();
+            case 'hostname':
+                return (host.mdns_name || host.hostname || '').toLowerCase();
+            case 'latency':
+                return host.latency == null ? null : Number(host.latency);
+            case 'services':
+                return host.services?.length || 0;
+            case 'os':
+                return (host.os_guess || host.suggested_type || host.device_class || '').toLowerCase();
+            default:
+                return '';
+        }
+    };
+
+    const handleSort = (column) => {
+        if (sortKey === column) {
+            setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'));
+            return;
+        }
+        setSortKey(column);
+        setSortDir(column === 'latency' || column === 'services' ? 'desc' : 'asc');
+    };
+
+    const filteredHosts = (results?.hosts?.filter(h => {
         if (!searchFilter) return true;
         const q = searchFilter.toLowerCase();
         return h.ip_address.includes(q) ||
@@ -278,7 +288,21 @@ const HostDiscovery = () => {
             (h.os_guess || '').toLowerCase().includes(q) ||
             (h.device_class || '').toLowerCase().includes(q) ||
             (h.suggested_type || '').toLowerCase().includes(q);
-    }) || [];
+    }) || []).slice().sort((left, right) => {
+        const leftValue = discoverySortValue(left, sortKey);
+        const rightValue = discoverySortValue(right, sortKey);
+        const leftEmpty = leftValue == null || leftValue === '';
+        const rightEmpty = rightValue == null || rightValue === '';
+        if (leftEmpty && rightEmpty) return 0;
+        if (leftEmpty) return 1;
+        if (rightEmpty) return -1;
+        const cmp = typeof leftValue === 'number' && typeof rightValue === 'number'
+            ? leftValue - rightValue
+            : String(leftValue).localeCompare(String(rightValue), undefined, { numeric: true, sensitivity: 'base' });
+        const ordered = sortDir === 'desc' ? -cmp : cmp;
+        if (ordered !== 0) return ordered;
+        return (ipToSortValue(left.ip_address) || 0) - (ipToSortValue(right.ip_address) || 0);
+    });
 
     const totalSelectedServices = Object.values(selectedServices)
         .reduce((acc, set) => acc + set.size, 0);
@@ -291,12 +315,9 @@ const HostDiscovery = () => {
         <div className="discovery-container">
             {/* Page Header */}
             <div className="discovery-page-header">
-                <div className="header-icon">
-                    <RadarIcon />
-                </div>
                 <div>
                     <h1>Network Discovery</h1>
-                    <p>Scan your network to find devices, MAC addresses, open ports, and services</p>
+                    <p>Scan the LAN for devices, names, open ports, and services.</p>
                 </div>
             </div>
 
@@ -314,7 +335,6 @@ const HostDiscovery = () => {
                             disabled={scanning}
                             required
                         />
-                        <small className="help-text">CIDR notation — supports /24, /16, etc.</small>
                     </div>
 
                     <div className="scan-form-group">
@@ -331,16 +351,17 @@ const HostDiscovery = () => {
                     </div>
 
                     <button type="submit" className="btn-scan" disabled={scanning || !network}>
-                        <RadarIcon />
+                        <ScanIcon />
                         {scanning ? 'Scanning…' : 'Start Scan'}
                     </button>
                 </form>
+                <small className="help-text">CIDR notation — supports /24, /16, etc.</small>
             </div>
 
             {/* Error */}
             {error && (
                 <div className="discovery-error">
-                    <AlertCircle />
+                    <WarnIcon />
                     {error}
                 </div>
             )}
@@ -402,7 +423,7 @@ const HostDiscovery = () => {
                     {/* Import Results Banner */}
                     {importResults && (
                         <div className="import-results-banner">
-                            <CheckCircle />
+                            <CheckIcon />
                             <div className="import-text">
                                 <strong>Imported {importResults.count} host{importResults.count !== 1 ? 's' : ''}</strong>
                                 {importResults.service_checks_created > 0 && (
@@ -458,13 +479,31 @@ const HostDiscovery = () => {
                                     <tr>
                                         <th></th>
                                         <th>Status</th>
-                                        <th>IP Address</th>
-                                        <th>MAC Address</th>
-                                        <th>Vendor</th>
-                                        <th>Hostname / mDNS</th>
-                                        <th>Latency</th>
-                                        <th>Services</th>
-                                        <th>OS / Device</th>
+                                        {[
+                                            ['ip', 'IP Address'],
+                                            ['mac', 'MAC Address'],
+                                            ['vendor', 'Vendor'],
+                                            ['hostname', 'Hostname / mDNS'],
+                                            ['latency', 'Latency'],
+                                            ['services', 'Services'],
+                                            ['os', 'OS / Device'],
+                                        ].map(([column, label]) => (
+                                            <th
+                                                key={column}
+                                                className={`sortable-th ${sortKey === column ? 'sorted' : ''}`}
+                                            >
+                                                <button
+                                                    type="button"
+                                                    className="sort-header-btn"
+                                                    onClick={() => handleSort(column)}
+                                                >
+                                                    {label}
+                                                    <span className="sort-indicator" aria-hidden="true">
+                                                        {sortKey === column ? (sortDir === 'asc' ? '▲' : '▼') : '↕'}
+                                                    </span>
+                                                </button>
+                                            </th>
+                                        ))}
                                         <th></th>
                                     </tr>
                                 </thead>
@@ -504,7 +543,7 @@ const HostDiscovery = () => {
                                                     })()}
                                                 </td>
                                                 <td className="host-hostname-cell">
-                                                    {host.mdns_name ? (
+                                                    {host.mdns_name && host.mdns_name !== host.ip_address ? (
                                                         <>
                                                             <span className="mdns-name" title={host.mdns_hostname || host.hostname}>
                                                                 {host.mdns_name}
@@ -514,7 +553,7 @@ const HostDiscovery = () => {
                                                             )}
                                                         </>
                                                     ) : (
-                                                        host.hostname || '—'
+                                                        (host.hostname && host.hostname !== host.ip_address) ? host.hostname : ''
                                                     )}
                                                     {host.last_seen && (
                                                         <span className="last-seen-label">
@@ -555,9 +594,7 @@ const HostDiscovery = () => {
                                                                 className={`os-badge confidence-${host.confidence || 'low'}`}
                                                                 title={(host.identification_clues || []).join(' · ') || host.device_hint || undefined}
                                                             >
-                                                                {host.os_guess && host.os_guess !== 'Unknown'
-                                                                    ? host.os_guess
-                                                                    : (host.suggested_type || 'unknown')}
+                                                                {displayOs(host) || host.device_class || 'unknown'}
                                                             </span>
                                                             {host.device_class && host.device_class !== 'unknown' && (
                                                                 <span className="device-class-label">{host.device_class}</span>
@@ -571,7 +608,7 @@ const HostDiscovery = () => {
                                                             className={`expand-btn ${expandedHosts.has(host.ip_address) ? 'expanded' : ''}`}
                                                             onClick={(e) => { e.stopPropagation(); toggleHostExpanded(host.ip_address); }}
                                                         >
-                                                            <ChevronDown />
+                                                            <ChevronIcon expanded={expandedHosts.has(host.ip_address)} />
                                                         </button>
                                                     )}
                                                 </td>

@@ -24,6 +24,7 @@ FINGERPRINT_PORTS = {
     161: 'SNMP',
     548: 'AFP',
     5353: 'MDNS',
+    5555: 'ADB',
     62078: 'APPLE_SYNC',
     8008: 'HTTP_ALT',
     8009: 'CAST',
@@ -34,6 +35,28 @@ FINGERPRINT_PORTS = {
     5432: 'POSTGRES',
     6379: 'REDIS',
 }
+
+# Only these labels are specific enough to show as an OS.
+SPECIFIC_OS = frozenset({
+    'Windows',
+    'macOS',
+    'iOS',
+    'tvOS',
+    'Android',
+    'Linux',
+    'Embedded Linux',
+})
+
+MIN_OS_POINTS = 6
+
+
+def is_specific_os(os_name: Optional[str]) -> bool:
+    return bool(os_name) and os_name in SPECIFIC_OS
+
+
+def _service_has(services: List[str], needle: str) -> bool:
+    token = needle.lower()
+    return any(token in str(service).lower() for service in services)
 
 
 @dataclass
@@ -138,23 +161,40 @@ def _score_from_mdns(mdns: Optional[Dict]) -> List[FingerprintScore]:
     friendly = (mdns.get('friendly_name') or '').lower()
     apple_model = (mdns.get('apple_model') or '').lower()
     services = mdns.get('mdns_services') or []
+    props = mdns.get('mdns_properties') or {}
+    cast_model = str(props.get('md') or props.get('fn') or mdns.get('friendly_name') or '').lower()
 
-    if apple_model.startswith('mac') or 'macbook' in friendly or 'imac' in friendly:
+    if apple_model.startswith('mac') or 'macbook' in friendly or 'imac' in friendly or 'mac mini' in friendly:
         label = mdns.get('apple_model') or 'Mac'
         scores.append(FingerprintScore('macOS', 'laptop', 10, f'mDNS: {mdns.get("friendly_name")} ({label})'))
     elif apple_model.startswith('iphone') or 'iphone' in friendly:
         scores.append(FingerprintScore('iOS', 'phone', 10, f'mDNS: {mdns.get("friendly_name")} ({mdns.get("apple_model") or "iPhone"})'))
     elif apple_model.startswith('ipad') or 'ipad' in friendly:
         scores.append(FingerprintScore('iOS', 'tablet', 10, f'mDNS: {mdns.get("friendly_name")}'))
-    elif any('_googlecast._tcp' in s for s in services):
-        model = mdns.get('mdns_properties', {}).get('md') or mdns.get('friendly_name')
-        scores.append(FingerprintScore('Embedded Linux', 'iot', 9, f'mDNS Cast device: {model}'))
-    elif any('_airplay._tcp' in s for s in services):
-        scores.append(FingerprintScore('Embedded Linux', 'iot', 7, f'mDNS AirPlay device: {mdns.get("friendly_name")}'))
-    elif any('_companion-link._tcp' in s for s in services):
-        scores.append(FingerprintScore('macOS/iOS', 'mobile', 9, f'mDNS Apple companion device: {mdns.get("friendly_name")}'))
-    elif any('_workstation._tcp' in s for s in services):
-        scores.append(FingerprintScore('Linux/Windows/macOS', 'workstation', 6, f'mDNS workstation: {mdns.get("friendly_name")}'))
+    elif 'appletv' in apple_model or 'apple tv' in friendly or apple_model.startswith('appletv'):
+        scores.append(FingerprintScore('tvOS', 'tv', 10, f'mDNS: {mdns.get("friendly_name")} ({mdns.get("apple_model") or "Apple TV"})'))
+    elif _service_has(services, '_androidtvremote2') or 'android tv' in friendly:
+        scores.append(FingerprintScore('Android', 'tv', 10, f'mDNS Android TV: {mdns.get("friendly_name")}'))
+    elif _service_has(services, '_amzn-wplay') or 'firetv' in friendly or 'fire tv' in friendly:
+        scores.append(FingerprintScore('Android', 'tv', 9, f'mDNS Fire TV / Fire OS: {mdns.get("friendly_name")}'))
+    elif _service_has(services, '_googlecast'):
+        if any(token in cast_model or token in friendly for token in (
+            'android tv', 'google tv', 'chromecast', 'shield', 'bravia', 'fire tv', 'firetv',
+        )):
+            scores.append(FingerprintScore('Android', 'tv', 8, f'mDNS Cast TV: {cast_model or mdns.get("friendly_name")}'))
+        elif any(token in cast_model or token in friendly for token in ('nest', 'home mini', 'speaker', 'audio')):
+            scores.append(FingerprintScore('Embedded Linux', 'iot', 8, f'mDNS Cast speaker: {cast_model or mdns.get("friendly_name")}'))
+        else:
+            scores.append(FingerprintScore('Android', 'tv', 6, f'mDNS Cast device: {cast_model or mdns.get("friendly_name")}'))
+    elif _service_has(services, '_apple-mobdev'):
+        scores.append(FingerprintScore('iOS', 'phone', 8, f'mDNS Apple mobile sync: {mdns.get("friendly_name")}'))
+    elif _service_has(services, '_companion-link'):
+        if _service_has(services, '_ssh') or _service_has(services, '_workstation') or _service_has(services, '_smb'):
+            scores.append(FingerprintScore('macOS', 'laptop', 8, f'mDNS Apple workstation: {mdns.get("friendly_name")}'))
+        else:
+            scores.append(FingerprintScore('iOS', 'phone', 7, f'mDNS Apple companion device: {mdns.get("friendly_name")}'))
+    elif _service_has(services, '_workstation') and apple_model:
+        scores.append(FingerprintScore('macOS', 'laptop', 7, f'mDNS workstation on Apple hardware: {mdns.get("friendly_name")}'))
     elif friendly:
         scores.append(FingerprintScore('Unknown', 'unknown', 3, f'mDNS name: {mdns.get("friendly_name")}'))
 
@@ -177,15 +217,14 @@ def _score_from_hostname(hostname: Optional[str]) -> List[FingerprintScore]:
         (r'raspberrypi|raspi', 'Linux', 'embedded', 8, 'Hostname suggests Raspberry Pi'),
         (r'ubuntu|debian|centos|fedora|rocky|alpine', 'Linux', 'server', 7, 'Hostname suggests Linux distro'),
         (r'router|gateway|ap-|unifi|synology|nas-', 'Embedded Linux', 'router', 6, 'Hostname suggests network appliance'),
-        (r'echo|alexa|firetv|chromecast|roku|esp[0-9]', 'Embedded Linux', 'iot', 6, 'Hostname suggests smart/IoT device'),
+        (r'echo|alexa|chromecast|roku|esp[0-9]', 'Embedded Linux', 'iot', 6, 'Hostname suggests smart/IoT device'),
+        (r'firetv|fire-tv|firestick|aftmm|aftsss', 'Android', 'tv', 8, 'Hostname suggests Amazon Fire OS (Android)'),
+        (r'appletv|apple-tv', 'tvOS', 'tv', 8, 'Hostname suggests Apple TV'),
     ]
 
     for pattern, os_name, device_class, points, reason in patterns:
         if re.search(pattern, name):
             scores.append(FingerprintScore(os_name, device_class, points, reason))
-
-    if name.endswith('.local'):
-        scores.append(FingerprintScore('macOS/iOS', 'mobile', 4, 'mDNS .local hostname (common on Apple devices)'))
 
     return scores
 
@@ -202,7 +241,7 @@ def _score_from_banners(probes: Dict[str, str]) -> List[FingerprintScore]:
         elif 'dropbear' in ssh_l:
             scores.append(FingerprintScore('Embedded Linux', 'iot', 7, f'SSH banner: {ssh[:80]}'))
         elif 'openssh' in ssh_l:
-            scores.append(FingerprintScore('Linux/Unix', 'server', 5, f'SSH banner: {ssh[:80]}'))
+            scores.append(FingerprintScore('Unknown', 'server', 2, f'SSH is OpenSSH — Linux, macOS, or BSD; banner does not name one'))
         elif 'windows' in ssh_l:
             scores.append(FingerprintScore('Windows', 'server', 8, f'SSH banner: {ssh[:80]}'))
 
@@ -231,40 +270,72 @@ def _score_from_ports(ports: set) -> List[FingerprintScore]:
 
     if 3389 in ports or (445 in ports and 135 in ports):
         scores.append(FingerprintScore('Windows', 'desktop', 8, 'Windows management/file-sharing ports open'))
-    if 62078 in ports or 548 in ports:
-        scores.append(FingerprintScore('macOS/iOS', 'mobile', 7, 'Apple service ports detected'))
+    if 548 in ports:
+        scores.append(FingerprintScore('macOS', 'laptop', 8, 'AFP file sharing — typical of macOS'))
+    if 62078 in ports:
+        scores.append(FingerprintScore('iOS', 'phone', 8, 'Apple lockdownd port — typical of iPhone/iPad'))
+    if 5555 in ports:
+        scores.append(FingerprintScore('Android', 'phone', 8, 'ADB port — typical of Android'))
     if 5353 in ports and not ({22, 80, 443, 445} & ports):
-        scores.append(FingerprintScore('Mobile/IoT', 'iot', 4, 'mDNS only — common on phones and smart devices'))
+        scores.append(FingerprintScore('Unknown', 'iot', 2, 'mDNS only — common on phones and smart devices'))
     if 161 in ports and 80 in ports:
         scores.append(FingerprintScore('Embedded Linux', 'router', 7, 'SNMP + HTTP — likely router or switch'))
     if 161 in ports:
         scores.append(FingerprintScore('Embedded Linux', 'network_device', 5, 'SNMP enabled'))
-    if 22 in ports and 6379 in ports and 3306 not in ports and 5432 not in ports:
-        scores.append(FingerprintScore('macOS/Linux', 'laptop', 5, 'Developer ports SSH + Redis (common on workstations)'))
-    if 22 in ports and not ({80, 443, 445, 3389} & ports):
-        scores.append(FingerprintScore('Linux/Unix', 'server', 4, 'SSH exposed without desktop service ports'))
     if 8009 in ports or 8008 in ports:
-        scores.append(FingerprintScore('Embedded Linux', 'iot', 6, 'Cast/streaming device ports detected'))
+        scores.append(FingerprintScore('Android', 'tv', 6, 'Cast/Android TV ports detected'))
     if 3306 in ports or 5432 in ports:
         scores.append(FingerprintScore('Linux', 'server', 6, 'Database service detected'))
-    if 80 in ports or 443 in ports:
-        scores.append(FingerprintScore('Linux/Embedded', 'server', 3, 'Web service detected'))
 
     return scores
 
 
-def _score_from_mac(mac_type: Optional[str], vendor: Optional[str]) -> List[FingerprintScore]:
+def _score_from_mac(
+    mac_type: Optional[str],
+    vendor: Optional[str],
+    *,
+    ports: Optional[set] = None,
+    hostname: Optional[str] = None,
+) -> List[FingerprintScore]:
     scores: List[FingerprintScore] = []
     vendor_l = (vendor or '').lower()
+    ports = ports or set()
+    name = (hostname or '').lower()
 
     if mac_type == 'private':
-        scores.append(FingerprintScore('iOS/Android/macOS', 'mobile', 5, 'Privacy MAC with no open ports — often a phone or tablet with inbound firewall'))
+        scores.append(FingerprintScore('Unknown', 'mobile', 2, 'Privacy MAC — common on phones; not enough to name the OS'))
+
+    if 'apple' in vendor_l:
+        if {22, 548, 5900, 445} & ports or any(token in name for token in ('macbook', 'imac', 'mac-mini', 'mac.')):
+            scores.append(FingerprintScore('macOS', 'laptop', 8, 'Apple hardware with workstation services'))
+        elif 62078 in ports or any(token in name for token in ('iphone', 'ipad', 'ipod')):
+            scores.append(FingerprintScore('iOS', 'phone', 8, 'Apple hardware with mobile sync/name'))
+        elif 'tv' in name or 'appletv' in name:
+            scores.append(FingerprintScore('tvOS', 'tv', 8, 'Apple TV hardware'))
+        elif mac_type == 'private' and not ports:
+            scores.append(FingerprintScore('iOS', 'phone', 6, 'Apple vendor + privacy MAC and no inbound ports — usually an iPhone'))
+        return scores
+
+    android_vendors = (
+        'samsung', 'google', 'xiaomi', 'redmi', 'oneplus', 'huawei', 'honor',
+        'motorola', 'oppo', 'vivo', 'pixel',
+    )
+    if any(token in vendor_l for token in android_vendors):
+        if mac_type == 'private' or not ports:
+            scores.append(FingerprintScore('Android', 'phone', 7, f'{vendor} hardware — typically Android'))
+        else:
+            scores.append(FingerprintScore('Android', 'phone', 6, f'{vendor} network hardware'))
+        return scores
+
+    if 'amazon' in vendor_l:
+        if 'echo' in name or 'alexa' in name:
+            scores.append(FingerprintScore('Embedded Linux', 'iot', 7, 'Amazon Echo / Alexa device'))
+        else:
+            scores.append(FingerprintScore('Android', 'tv', 7, 'Amazon hardware — Fire OS is Android-based'))
+        return scores
 
     vendor_map = [
-        ('apple', 'macOS/iOS', 'mobile', 7, 'Apple network hardware'),
         ('microsoft', 'Windows', 'desktop', 6, 'Microsoft network hardware'),
-        ('amazon', 'Embedded Linux', 'iot', 6, 'Amazon smart device'),
-        ('google', 'Embedded Linux', 'iot', 6, 'Google/Chromecast device'),
         ('tp-link', 'Embedded Linux', 'router', 7, 'TP-Link network device'),
         ('ubiquiti', 'Embedded Linux', 'router', 7, 'Ubiquiti network device'),
         ('raspberry pi', 'Linux', 'embedded', 8, 'Raspberry Pi'),
@@ -283,10 +354,10 @@ def _score_from_ttl(ttl: Optional[int]) -> List[FingerprintScore]:
     if ttl is None:
         return []
     if ttl <= 64:
-        return [FingerprintScore('Linux/Unix/macOS/iOS/Android', 'mobile', 4, f'Ping TTL {ttl} (typical for Unix-like/mobile OS)')]
+        return [FingerprintScore('Unknown', 'unknown', 1, f'Ping TTL {ttl} is Unix-like (Linux, macOS, iOS, and Android all use 64)')]
     if ttl <= 128:
-        return [FingerprintScore('Windows', 'desktop', 4, f'Ping TTL {ttl} (typical for Windows)')]
-    return [FingerprintScore('Network Device', 'router', 3, f'Ping TTL {ttl} (typical for routers)')]
+        return [FingerprintScore('Windows', 'desktop', 6, f'Ping TTL {ttl} (typical for Windows)')]
+    return [FingerprintScore('Embedded Linux', 'router', 3, f'Ping TTL {ttl} (typical for routers)')]
 
 
 def _pick_best(scores: List[FingerprintScore]) -> DeviceFingerprint:
@@ -304,18 +375,28 @@ def _pick_best(scores: List[FingerprintScore]) -> DeviceFingerprint:
     clues: List[str] = []
 
     for score in scores:
-        os_totals[score.os_name] = os_totals.get(score.os_name, 0) + score.points
-        class_totals[score.device_class] = class_totals.get(score.device_class, 0) + score.points
+        if is_specific_os(score.os_name):
+            os_totals[score.os_name] = os_totals.get(score.os_name, 0) + score.points
+        if score.device_class and score.device_class != 'unknown':
+            class_totals[score.device_class] = class_totals.get(score.device_class, 0) + score.points
         if score.reason not in clues:
             clues.append(score.reason)
 
-    best_os = max(os_totals, key=os_totals.get)
-    best_class = max(class_totals, key=class_totals.get)
-    best_points = os_totals[best_os]
+    if os_totals:
+        best_os = max(os_totals, key=os_totals.get)
+        best_points = os_totals[best_os]
+        if best_points < MIN_OS_POINTS:
+            best_os = 'Unknown'
+            best_points = 0
+    else:
+        best_os = 'Unknown'
+        best_points = 0
+
+    best_class = max(class_totals, key=class_totals.get) if class_totals else 'unknown'
 
     if best_points >= 8:
         confidence = 'high'
-    elif best_points >= 5:
+    elif best_points >= MIN_OS_POINTS:
         confidence = 'medium'
     else:
         confidence = 'low'
@@ -333,7 +414,7 @@ def _pick_best(scores: List[FingerprintScore]) -> DeviceFingerprint:
 def _to_suggested_type(os_name: str, device_class: str) -> str:
     mapping = {
         'macOS': 'macos',
-        'macOS/iOS': 'apple_device',
+        'tvOS': 'tv',
         'iOS': 'ios',
         'Android': 'android',
         'Linux': 'linux',
@@ -381,7 +462,7 @@ def fingerprint_device(
     scores.extend(_score_from_mdns(mdns))
     scores.extend(_score_from_hostname(hostname))
     scores.extend(_score_from_ports(open_ports))
-    scores.extend(_score_from_mac(mac_type, vendor))
+    scores.extend(_score_from_mac(mac_type, vendor, ports=open_ports, hostname=hostname))
     scores.extend(_score_from_ttl(ping_ttl))
 
     if deep_probe and open_ports:
@@ -404,3 +485,27 @@ def fingerprint_device(
     result.identification_clues = stamped.get('identification_clues') or result.identification_clues
     result.privacy_reason = stamped.get('privacy_reason')
     return result
+
+
+def fingerprint_from_host_payload(data: Optional[Dict], *, deep_probe: bool = False) -> DeviceFingerprint:
+    """Re-score a stored host/observation dict without opening new sockets."""
+    data = data or {}
+    mdns = None
+    if data.get('mdns_services') or data.get('apple_model') or data.get('mdns_name'):
+        mdns = {
+            'friendly_name': data.get('mdns_name') or data.get('display_name'),
+            'hostname': data.get('hostname') or data.get('mdns_hostname'),
+            'mdns_services': data.get('mdns_services') or [],
+            'mdns_properties': data.get('mdns_properties') or {},
+            'apple_model': data.get('apple_model'),
+        }
+    return fingerprint_device(
+        data.get('ip_address') or '',
+        hostname=data.get('mdns_name') or data.get('hostname'),
+        services=data.get('services') or data.get('discovered_services'),
+        mac_type=data.get('mac_type'),
+        vendor=data.get('vendor'),
+        ping_ttl=data.get('ping_ttl'),
+        mdns=mdns,
+        deep_probe=deep_probe,
+    )

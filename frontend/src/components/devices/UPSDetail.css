@@ -1,22 +1,23 @@
 .ups-detail {
   width: 100%;
-  padding: 2rem;
+  padding: 0;
 }
 
 .ups-detail-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 2rem;
+  margin-bottom: 1.15rem;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .ups-detail-header h2 {
-  font-size: 2rem;
+  font-size: var(--title-size);
   color: var(--text-primary);
   margin: 0.5rem 0 0 0;
   font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
 .btn-back {

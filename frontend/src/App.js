@@ -20,6 +20,7 @@ import CustomDashboard from './components/dashboards/CustomDashboard';
 import HostDiscovery from './components/hosts/HostDiscovery';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import TopologyGraph from './components/NetworkMap/TopologyGraph';
+import { DuckMark, GridIcon, ListIcon, MoonIcon, ShieldIcon, SunIcon, UsersIcon } from './components/common/Icons';
 
 import './App.css';
 
@@ -37,6 +38,10 @@ const Navbar = () => {
   React.useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    if (themeColor) {
+      themeColor.setAttribute('content', theme === 'dark' ? '#111411' : '#3d6b42');
+    }
   }, [theme]);
 
   React.useEffect(() => {
@@ -85,6 +90,7 @@ const Navbar = () => {
     <nav className="navbar">
       <div className="nav-container">
         <Link to="/" className="nav-logo">
+          <DuckMark size={38} />
           <h1 className="nav-logo-text">Duck Monitoring</h1>
         </Link>
 
@@ -117,6 +123,7 @@ const Navbar = () => {
           <Link to="/alerts" className="nav-link">Alerts</Link>
         </div>
 
+        <div className="nav-end">
         <div className="nav-user">
           <span className="nav-username">{user?.username}</span>
 
@@ -167,13 +174,14 @@ const Navbar = () => {
                       gap: '0.75rem'
                     }}
                   >
-                    {theme === 'light' ? '🌙 Dark Mode' : '☀️ Light Mode'}
+                    {theme === 'light' ? <MoonIcon /> : <SunIcon />}
+                    {theme === 'light' ? 'Dark mode' : 'Light mode'}
                   </button>
                   <Link to="/dashboards" className="nav-dropdown-link" onClick={closeMenu}>
-                    📊 My Dashboards
+                    <GridIcon /> My dashboards
                   </Link>
                   <Link to="/security" className="nav-dropdown-link" onClick={closeMenu}>
-                    🔐 Security Settings
+                    <ShieldIcon /> Security
                   </Link>
                 </div>
 
@@ -181,10 +189,10 @@ const Navbar = () => {
                   <div className="nav-dropdown-section">
                     <div className="nav-dropdown-label">Administration</div>
                     <Link to="/users" className="nav-dropdown-link" onClick={closeMenu}>
-                      👥 User Management
+                      <UsersIcon /> Users
                     </Link>
                     <Link to="/audit-logs" className="nav-dropdown-link" onClick={closeMenu}>
-                      📋 Audit Logs
+                      <ListIcon /> Audit log
                     </Link>
                   </div>
                 )}
@@ -197,6 +205,7 @@ const Navbar = () => {
               </div>
             </>
           )}
+        </div>
         </div>
       </div>
     </nav>
