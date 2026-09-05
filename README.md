@@ -1,205 +1,117 @@
-# Duck Monitoring - Hybrid Network Monitoring Tool
+# Duck Monitoring
 
-A modern, hybrid network monitoring system with agent-based monitoring and historical data visualization.
+A personal LAN monitoring stack: see what is on the network, keep those devices as a lasting inventory, and watch reachability, agents, UPS, and SNMP hardware from one UI.
 
-## Features
+Docker Compose is the supported way to run it. The browser talks to `http://localhost:3000`; nginx proxies `/api` and `/admin` so you do not open port 8000.
 
-- **Agent-based Monitoring**: Lightweight Python agents collect metrics from remote hosts
-- **Historical Data Graphing**: Visualize metrics over time with interactive Chart.js charts
-- **Real-time Status**: Monitor host health and service status in real-time
-- **Service Checks**: CPU, Memory, Disk, and Network monitoring with status indicators
-- **SNMP Monitoring**: Monitor HPE iLO and Dell iDRAC devices via SNMP
-- **RESTful API**: Clean REST API for managing hosts, checks, and retrieving data
-- **Modern Web UI**: React-based dashboard with responsive design and gradient styling
-- **Time-series Data**: Store and query historical metrics with flexible time ranges
+![Hosts Overview](docs/images/hosts-overview.png)
 
-## Architecture
+![Network Discovery](docs/images/discovery.png)
 
-- **Backend**: Django 6 + Django REST Framework (default port: 8000)
-- **Database**: SQLite (local/dev) or PostgreSQL 18 (Docker)
-- **Frontend**: React 19 + Vite with Chart.js
-- **Agents**: Python-based monitoring agents using psutil
+![Alerts](docs/images/alerts.png)
 
-## Project Structure
+![Network Topology](docs/images/topology.png)
 
-```
-├── backend_django/   # Django API server
-│   ├── config/       # Project configuration
-│   ├── core/         # Core application logic
-│   ├── manage.py     # Django management script
-│   └── requirements.txt
-├── frontend/         # React web application
-│   ├── src/
-│   │   ├── components/  # React components
-│   │   ├── services/    # API service layer
-│   │   └── App.js
-│   └── package.json
-├── agent/            # Monitoring agent code
-│   ├── agent.py      # Main agent script
-│   └── requirements.txt
-├── scripts/          # Operational scripts
-│   ├── start.sh      # Unified startup (setup + Redis + backend + Celery + frontend)
-│   ├── stop.sh       # Stop all services
-│   ├── status.sh     # Check server status
-│   ├── initial_startup.sh  # Alias for start.sh --reset
-├── README.md
-├── docs/             # Documentation
-│   ├── SETUP.md      # Detailed setup instructions
-│   ├── QUICKSTART.md # Quick start guide
-│   ├── AGENT_INSTALL.md # Agent installation guide
-│   └── TROUBLESHOOTING.md # Troubleshooting guide
-```
+## What it does
 
-## Quick Start
+- **Hosts Overview** — lasting inventory with groups, drag-and-drop, assumed names, vendor, last seen, and open ports. Expand a row for latency, ping TTL, and watched checks.
+- **Watch LAN** — keep scanning quietly and add new devices as they appear instead of treating Discovery as a one-shot import.
+- **Discovery** — active subnet scan plus passive mDNS / SSDP / ARP. OS is only shown when we can actually tell (Windows, macOS, iOS, Android, Linux, and so on), not a guessed slash-union.
+- **Agent checks** — optional Python agents report CPU, memory, disk, and network.
+- **Agentless checks** — ping, HTTP, SSH, TCP, and similar service checks on imported hosts.
+- **Hardware** — UPS and SNMP (HPE iLO, Dell iDRAC, generic OIDs).
+- **Alerts** — rules and notification channels for new, gone, and down devices.
+- **Topology** — a simple map of known hosts.
+- **First-run setup** — create the admin user in the browser; no fixture passwords.
 
-**Recommended:** Docker Compose (Postgres, Redis, API, Celery, UI):
+The UI is a muted terminal theme (IBM Plex Mono, light or dark). It is a React 19 + Vite app in front of Django 6, Postgres 18, Redis, and Celery.
+
+## Run it
+
+You need [Docker](https://docs.docker.com/get-docker/) with Compose V2 (`docker compose version`).
 
 ```bash
 ./scripts/docker-up.sh
 ```
 
-Then open `http://localhost:3000` and create the first admin user.
+That creates `.env` from `.env.example` if needed, starts Postgres, Redis, the API, Celery, and the UI, and on macOS starts a small host collector so Docker can still see ARP / MAC / names.
 
-See [docs/DOCKER_QUICKSTART.md](docs/DOCKER_QUICKSTART.md) and [docs/QUICKSTART.md](docs/QUICKSTART.md).
-
-### Using Docker Test Hosts
-
-To quickly test with multiple hosts, use the Docker setup:
+Open **http://localhost:3000** and create the first admin user.
 
 ```bash
-cd docker
-./start-hosts.sh
-```
-
-This will start 6 test hosts (web servers, database, cache, app servers) that automatically report to your monitoring server. See [docker/README.md](docker/README.md) for details.
-
-## Getting Started
-
-### Start Everything (local/dev)
-
-For host-network discovery on macOS, or working on the code without Docker:
-
-```bash
-./scripts/start.sh
-```
-
-On first run it automatically:
-- Creates the Python virtual environment and installs backend dependencies
-- Runs database migrations
-- Installs frontend Node dependencies
-- Starts Redis if it is not already running
-- Starts the Django API (`http://localhost:8000`), Celery worker, and React UI (`http://localhost:3000`)
-
-To wipe the database and start fresh:
-
-```bash
-./scripts/start.sh --reset
-# or: ./scripts/initial_startup.sh  (same thing)
-```
-
-Then open `http://localhost:3000` to register your first admin user.
-
-## Server Management
-
-Docker (recommended):
-
-```bash
-./scripts/docker-up.sh
-./scripts/docker-down.sh
+./scripts/docker-up.sh --rebuild   # rebuild images after frontend or backend edits
+./scripts/docker-up.sh --reset     # wipe volumes (destroys data)
+./scripts/docker-down.sh           # stop, keep data
+./scripts/docker-down.sh --wipe    # stop and delete volumes
 docker compose logs -f
 ```
 
-Local/dev:
+Health: `http://localhost:3000/api/health/`
+
+If you reach the UI by a LAN IP instead of localhost, set `CSRF_TRUSTED_ORIGINS` in `.env` and recreate the backend container. Details: [docs/DOCKER_QUICKSTART.md](docs/DOCKER_QUICKSTART.md).
+
+### Local / dev (no Compose)
+
+Use this when you are editing code against a host-network stack, or you want Discovery without Docker Desktop’s multicast limits:
 
 ```bash
-./scripts/start.sh    # Start everything (idempotent)
-./scripts/stop.sh     # Stop backend, Celery, frontend (and Redis if we started it)
-./scripts/status.sh   # Check what's running
+./scripts/start.sh            # API :8000, UI :3000, Redis, Celery
+./scripts/stop.sh
+./scripts/status.sh
+./scripts/start.sh --reset    # wipe the local SQLite database
 ```
 
-### Individual Server Control
+Logs land in `/tmp/duck-monitoring-backend.log`, `/tmp/duck-monitoring-frontend.log`, and `/tmp/duck-monitoring-celery.log`.
+
+## Agents
+
+From the UI, copy the install snippet (it points at this server). Or, against a Compose stack:
+
 ```bash
-./scripts/start-backend.sh   # Start backend only
-./scripts/start-frontend.sh  # Start frontend only
+curl -sSL http://localhost:3000/api/agent/install.sh | sudo bash
 ```
 
-**Note:** Server logs are written to:
-- Backend: `/tmp/duck-monitoring-backend.log`
-- Frontend: `/tmp/duck-monitoring-frontend.log`
-- Celery: `/tmp/duck-monitoring-celery.log`
+Manual:
 
-### Agent Setup
-
-**One-command installation (recommended):**
-```bash
-curl -sSL http://your-monitoring-server:8000/api/agent/install.sh | sudo bash
-```
-
-**Manual installation:**
 ```bash
 cd agent
 python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install -r requirements.txt
-python agent.py --server http://localhost:8000 --hostname my-host
+python agent.py --server http://localhost:3000 --hostname my-host
 ```
 
-## Configuration
+Against a local `./scripts/start.sh` stack, use `--server http://localhost:8000` instead.
 
-Edit `backend_django/config/settings.py` to configure:
-- Database connection (default: SQLite - no setup required!)
-- API host and port (default: 8000)
-- Agent authentication token
+There is also a set of fake agent hosts under `docker/` for UI testing. See [docker/README.md](docker/README.md).
 
-### Using PostgreSQL (Optional)
+## Layout
 
-if you want to use PostgreSQL instead of SQLite:
-1. Ensure PostgreSQL driver is installed (included in `requirements.txt`)
-2. Set `DATABASE_URL` environment variable or edit `config/settings.py`
+```
+backend_django/     Django API, inventory, discovery, alerts, Celery tasks
+frontend/           React UI (Vite). Production image is nginx.
+agent/              Optional host agent
+scripts/
+  docker-up.sh      Blessed start
+  docker-down.sh    Blessed stop
+  lan_identity.py   Host ARP/mDNS helper used by docker-up on macOS
+  start.sh          Local/dev stack
+data/lan/           Host collector output (identity.json). Not committed.
+docs/               Setup, Docker, agents, architecture
+```
 
-## API Endpoints
+The frontend Docker image is a production build. After UI changes, run `./scripts/docker-up.sh --rebuild` (or `docker compose up -d --build frontend`). Backend Python is also baked into the image, so rebuild the backend service after API changes.
 
-### Hosts
-- `GET /api/hosts` - List all hosts
-- `GET /api/hosts/<id>` - Get host details
-- `POST /api/hosts` - Create a host
-- `DELETE /api/hosts/<id>` - Delete a host
+## Docs
 
-### Agent
-- `POST /api/agents/register` - Register an agent
-- `POST /api/agents/submit` - Submit monitoring data
-
-### Metrics & Checks
-- `GET /api/hosts/<id>/metrics` - Get metrics (supports `metric_name`, `metric_type`, `hours` params)
-- `GET /api/hosts/<id>/metrics/summary` - Get metrics summary
-- `GET /api/hosts/<id>/checks` - Get service checks
-
-## Monitoring Capabilities
-
-### Agent-based Monitoring
-The agent monitors:
-- **CPU**: Usage percentage, per-core metrics
-- **Memory**: Usage, available, total (GB)
-- **Disk**: Usage percentage, used/free space for each partition
-- **Network**: Bytes sent/received, packets sent/received
-
-### Service Checks (Agentless)
-- **Ping**: ICMP connectivity checks
-- **SSH**: SSH service availability
-- **HTTP/HTTPS**: Web service monitoring
-- **TCP/UDP**: Port availability checks
-- **DNS**: DNS resolution checks
-- **SNMP**: Generic SNMP monitoring with custom OIDs
-- **HPE iLO**: SNMP monitoring for HPE Integrated Lights-Out (health, temperature, power, fan status)
-- **Dell iDRAC**: SNMP monitoring for Dell Integrated Dell Remote Access Controller (health, temperature, power, fan status)
-
-## Documentation
-
-- [docs/SETUP.md](docs/SETUP.md) - Detailed setup and configuration guide
-- [docs/QUICKSTART.md](docs/QUICKSTART.md) - Quick start guide
-- [docs/AGENT_INSTALL.md](docs/AGENT_INSTALL.md) - Complete guide for installing agents on remote hosts
+- [docs/DOCKER_QUICKSTART.md](docs/DOCKER_QUICKSTART.md) — Compose, `.env`, LAN caveats
+- [docs/QUICKSTART.md](docs/QUICKSTART.md) — first hour
+- [docs/SETUP.md](docs/SETUP.md) — local/dev setup
+- [docs/AGENT_INSTALL.md](docs/AGENT_INSTALL.md) — remote agents
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how the pieces fit
+- [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — common failures
+- [CONTRIBUTING.md](CONTRIBUTING.md) — branch and PR notes
 
 ## License
 
 This project is open source and available for use.
-

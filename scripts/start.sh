@@ -3,7 +3,7 @@
 # Duck Monitoring - Unified Startup Script
 # Sets up dependencies (first run), starts Redis if needed, then backend, Celery, and frontend.
 #
-# Local/dev startup (venv + Redis + Django + Celery + CRA).
+# Local/dev startup (venv + Redis + Django + Celery + Vite).
 # For the supported deploy path use: ./scripts/docker-up.sh
 #
 # Usage:

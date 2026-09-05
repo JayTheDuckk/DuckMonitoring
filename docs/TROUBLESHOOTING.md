@@ -1,94 +1,111 @@
-# Troubleshooting Guide
+# Troubleshooting
 
-## "Not Found" Error
+Compose is the supported stack. The UI and the API share **http://localhost:3000**. Health is `GET /api/health/` and returns `{"status":"ok"}`. Hosts live at `/api/inventory/hosts/`, not `/api/hosts`.
 
-If you're seeing a "Not Found" error, here's how to diagnose and fix it:
+## Compose
 
-### 1. Check Which Service You're Accessing
-
-**Backend API (http://localhost:8000):**
-- Should show JSON with API information at the root `/`
-- Try: `http://localhost:8000/api/health` - should return `{"status": "healthy"}`
-- Try: `http://localhost:8000/api/hosts` - should return `[]` (empty array if no hosts)
-
-**Frontend (http://localhost:3000):**
-- Should show the Duck Monitoring dashboard
-- If you see "Not Found" here, the frontend might not be running
-
-### 2. Verify Services Are Running
-
-**Check Backend:**
-```bash
-# In backend directory
-cd backend_django
-python manage.py runserver
-# Should see: "Running on http://0.0.0.0:8000"
-```
-
-**Check Frontend:**
-```bash
-# In frontend directory
-cd frontend
-npm start
-# Should open http://localhost:3000 automatically
-```
-
-### 3. Common Issues
-
-**Issue: Backend not running**
-- Determine if backend is running
-- Verify: Visit `http://localhost:8000/api/health` in browser
-
-**Issue: Frontend can't connect to backend**
-- Check: Is backend running on port 8000?
-- Check: Browser console for CORS errors
-- Verify: `frontend/src/services/api.js` has correct port (8000)
-
-**Issue: Wrong URL**
-- Backend API: `http://localhost:8000/api/*`
-- Frontend UI: `http://localhost:3000`
-- Don't mix them up!
-
-**Issue: Port already in use**
-- Backend: Change port with `python manage.py runserver 8001` or edit `config/settings.py`
-- Frontend: React dev server will automatically use next available port
-
-### 4. Test API Endpoints
-
-Use curl or your browser to test:
+**UI loads, login fails, or `/api` is 404**
 
 ```bash
-# Health check
-curl http://localhost:8000/api/health
-
-# Get all hosts
-curl http://localhost:8000/api/hosts
-
-# Root endpoint (API info)
-curl http://localhost:8000/
+curl http://localhost:3000/api/health/
+docker compose ps
+docker compose logs backend
+docker compose logs frontend
 ```
 
-### 5. Check Browser Console
+Confirm nginx is proxying: you should not need port 8000 on the host.
 
-Open browser developer tools (F12) and check:
-- Console tab for JavaScript errors
-- Network tab to see if API calls are failing
-- Look for 404 errors on specific endpoints
+**Backend stays unhealthy**
 
-### 6. Verify Database
+First boot runs migrations. Wait ~30s, then `docker compose logs backend`.
 
-If backend starts but endpoints return errors:
+**Changed frontend/backend code, nothing changed in the browser**
+
+Images are baked. Rebuild:
+
 ```bash
-# Check if database file exists
-ls -la backend_django/db.sqlite3
-
-# If it doesn't exist, the app will create it on first run
+./scripts/docker-up.sh --rebuild
+# or
+docker compose up -d --build frontend
+docker compose up -d --build backend
 ```
 
-## Still Having Issues?
+Hard-refresh the tab.
 
-1. Check that both backend and frontend are running
-2. Verify ports match (backend: 8000, frontend: 3000)
-3. Check browser console for specific error messages
-4. Try accessing the backend API directly in browser: `http://localhost:8000/api/health`
+**CSRF / login from a LAN IP**
 
+Set `CSRF_TRUSTED_ORIGINS` (and `ALLOWED_HOSTS`) in `.env` to include `http://<that-ip>:3000`, then recreate the backend container.
+
+**No MAC, vendor, or names (macOS Docker)**
+
+`./scripts/docker-up.sh` should start `scripts/lan_identity.py` and write `data/lan/identity.json`. If that file is empty or missing, Discovery will look thin. Docker Desktop still cannot do full mDNS; use `./scripts/start.sh` when you need that.
+
+**Watch LAN / checks idle**
+
+```bash
+docker compose logs celery-worker
+docker compose logs celery-beat
+```
+
+**Clean slate**
+
+```bash
+./scripts/docker-up.sh --reset
+```
+
+## Local `./scripts/start.sh`
+
+Here the API is **http://localhost:8000** and the Vite UI is **http://localhost:3000**.
+
+```bash
+curl http://localhost:8000/api/health/
+./scripts/status.sh
+```
+
+Logs: `/tmp/duck-monitoring-backend.log`, `/tmp/duck-monitoring-frontend.log`, `/tmp/duck-monitoring-celery.log`.
+
+**Backend will not start**
+
+- Port 8000 in use
+- `cd backend_django && source venv/bin/activate && python manage.py runserver`
+- SQLite at repo-root `db.sqlite3` must be writable
+
+**Frontend will not start**
+
+- Vite, not CRA: `cd frontend && npm start`
+- `rm -rf node_modules && npm install` if the lock is confused
+- Default API base is `http://<hostname>:8000/api` unless `VITE_API_URL` is set
+
+**Celery / checks idle**
+
+Redis must be running. `./scripts/start.sh` tries to start it.
+
+**Reset local data**
+
+```bash
+./scripts/start.sh --reset
+```
+
+## Agents
+
+`--server` must be reachable from the agent host.
+
+| How you run the server | Typical `--server` |
+|------------------------|--------------------|
+| `./scripts/docker-up.sh` | `http://localhost:3000` or `http://<lan-ip>:3000` |
+| `./scripts/start.sh` | `http://localhost:8000` |
+
+```bash
+# Compose
+curl http://localhost:3000/api/health/
+# Local
+curl http://localhost:8000/api/health/
+```
+
+See [AGENT_INSTALL.md](AGENT_INSTALL.md).
+
+## Still stuck
+
+1. Decide which stack you are on (Compose vs `start.sh`) and use the matching health URL.
+2. Browser Network tab: 401 is auth; 404 on `/api/hosts` means an old path — use `/api/inventory/hosts/`.
+3. Backend tests: `docker compose exec backend python manage.py test` or the same from `backend_django` in a venv.

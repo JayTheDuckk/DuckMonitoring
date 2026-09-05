@@ -1,41 +1,28 @@
-# Quick Start Guide
+# Quick Start
 
-Get up and running with Duck Monitoring in minutes.
+Docker Compose is the supported path. The UI is `http://localhost:3000`; nginx proxies `/api` and `/admin`.
 
-## 1. Start with Docker (recommended)
+## 1. Start the stack
 
 ```bash
 ./scripts/docker-up.sh
 ```
 
-This starts Postgres, Redis, the API, Celery, and the UI. Open `http://localhost:3000` and create your admin user.
+That creates `.env` if needed, starts Postgres, Redis, the API, Celery, and the UI, and on macOS starts a host collector so ARP / MAC / names can still reach Docker.
 
-Details: [DOCKER_QUICKSTART.md](DOCKER_QUICKSTART.md).
+Open **http://localhost:3000** and create the first admin user.
 
-## 2. Or start locally (dev / LAN discovery on a Mac)
+More Compose detail: [DOCKER_QUICKSTART.md](DOCKER_QUICKSTART.md).
 
-```bash
-./scripts/start.sh
-```
+## 2. First hour in the UI
 
-On first run it will automatically:
-- Create a Python virtual environment and install backend dependencies
-- Run database migrations
-- Install frontend Node dependencies
-- Start Redis if it is not already running
-- Start the API on `http://localhost:8000`
-- Start the Web UI on `http://localhost:3000`
+1. **Hosts Overview** (`/`) — lasting inventory. Add a group, add a host, or turn on **Watch LAN** so new devices are kept automatically.
+2. **Discovery** (`/discovery`) — scan a subnet, then import what you want (or let Watch LAN do it).
+3. **Alerts** — a default pack covers new, gone, and down hosts. Add a channel if you want notifications.
+4. **Hardware** — UPS and SNMP if you have them.
+5. **Agent** — optional. Use the Agent button on Hosts Overview, or see [AGENT_INSTALL.md](AGENT_INSTALL.md).
 
-## 3. Initial Browser Setup
-
-Once the script finishes:
-1. Open your browser to `http://localhost:3000`
-2. You will be redirected to the **Setup** page
-3. Create your first administrative user account
-
-## 4. Daily Use
-
-Docker:
+## 3. Daily commands
 
 ```bash
 ./scripts/docker-up.sh
@@ -43,56 +30,53 @@ Docker:
 docker compose logs -f
 ```
 
-Local/dev:
+Rebuild after frontend or backend edits (`./scripts/docker-up.sh --rebuild`). Wipe volumes with `./scripts/docker-up.sh --reset`.
+
+## 4. Local / dev (no Compose)
+
+Use this to edit against a host-network stack, or when Docker Desktop cannot see multicast:
 
 ```bash
-./scripts/start.sh    # Start everything
-./scripts/stop.sh     # Stop everything
-./scripts/status.sh   # Check what's running
+./scripts/start.sh            # API :8000, Vite UI :3000, Redis, Celery
+./scripts/stop.sh
+./scripts/status.sh
+./scripts/start.sh --reset    # wipe the local SQLite database
 ```
 
-To wipe the database and start fresh:
+Health is then `http://localhost:8000/api/health/`. Agents should use `--server http://localhost:8000`.
 
-```bash
-./scripts/start.sh --reset
-```
+## 5. Optional agent
 
-## 5. Start an Agent
-
-In another terminal:
+Against Compose:
 
 ```bash
 cd agent
 python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install -r requirements.txt
-python agent.py --server http://localhost:8000
+python agent.py --server http://localhost:3000 --hostname my-host
 ```
 
-Or use Docker test hosts — see [../docker/README.md](../docker/README.md).
-
-## 6. View Your Dashboard
-
-Open `http://localhost:3000` to see:
-- Registered hosts and real-time status
-- Service checks (CPU, Memory, Disk)
-- Historical metrics and graphs
+Fake lab agents: [../docker/README.md](../docker/README.md).
 
 ## Troubleshooting
 
-**Backend won't start:**
-- Check if port 8000 is available
-- Verify Python 3.8+ is installed
+**UI loads, API 404 or login fails**
 
-**Service checks not running:**
-- Redis must be running for Celery — `./scripts/start.sh` starts it automatically if possible
-- Check Celery logs: `/tmp/duck-monitoring-celery.log`
+```bash
+curl http://localhost:3000/api/health/
+docker compose logs backend
+docker compose logs frontend
+```
 
-**Frontend won't connect:**
-- Docker: `curl http://localhost:3000/api/health/`
-- Local/dev: `curl http://localhost:8000/api/health/`
-- Check browser console for errors
+**Checks never run**
 
-**Agent won't register:**
-- Verify backend URL is correct
-- Ensure backend is running
+Celery needs Redis. `docker compose logs celery-worker` (Compose) or `/tmp/duck-monitoring-celery.log` (local).
+
+**No MAC / vendor / names on macOS Docker**
+
+Confirm `./scripts/docker-up.sh` started the host collector (`data/lan/identity.json`). Full mDNS from Docker Desktop is still limited; `./scripts/start.sh` sees more.
+
+**Agent will not register**
+
+`--server` must be the URL the agent can reach. Compose: port **3000**. Local `start.sh`: port **8000**.

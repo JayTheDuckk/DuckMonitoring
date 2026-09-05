@@ -1,39 +1,60 @@
 # Contributing to Duck Monitoring
 
-First off, thank you for considering contributing to Duck Monitoring! It's people like you that make Duck Monitoring such a great tool.
+Thanks for wanting to change it.
 
-## Where do I go from here?
+## Issues
 
-If you've noticed a bug or have a feature request, make sure to check our Issues tab to see if someone else has already created a ticket. If not, go ahead and make one!
+Check existing issues first. Open a new one if nothing matches.
 
-## Setting up your environment
+## How to run it
 
-1. **Fork the repository** on GitHub.
-2. **Clone your fork** locally.
-3. **Backend Setup**:
-    ```bash
-    cd backend_django
-    python3 -m venv venv
-    source venv/bin/activate
-    pip install -r requirements.txt
-    python manage.py migrate
-    ```
-4. **Frontend Setup**:
-    ```bash
-    cd frontend
-    npm install
-    npm start   # Vite dev server on port 3000
-    ```
+Supported path:
 
-## Submitting a Pull Request
+```bash
+./scripts/docker-up.sh
+```
 
-1. **Branch** off of `main` for your work.
-2. Write clean, modular code.
-3. If you are changing the API or backend logic, please ensure existing tests pass.
-4. **Submit a Draft PR** early if you want feedback.
-5. Once ready, un-draft it and request a review.
+UI: `http://localhost:3000`. After frontend or backend edits, rebuild that image (`./scripts/docker-up.sh --rebuild` or `docker compose up -d --build frontend` / `backend`). Bind-mounts do not include app source.
 
-## Code Style
+Local/dev (Vite + Django + SQLite, better LAN multicast):
 
-* **Python**: We follow standard PEP 8.
-* **React**: We use ESLint standard configurations. Please format your components before submitting.
+```bash
+./scripts/start.sh
+```
+
+Details: [docs/DOCKER_QUICKSTART.md](docs/DOCKER_QUICKSTART.md), [docs/SETUP.md](docs/SETUP.md).
+
+### Backend only
+
+```bash
+cd backend_django
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py test
+```
+
+CI runs these tests on Python 3.13.
+
+### Frontend only
+
+```bash
+cd frontend
+npm install
+npm start    # Vite on port 3000
+```
+
+## Pull requests
+
+1. Branch from `main`.
+2. Keep the diff focused.
+3. If you touch the API or fingerprinting, run the Django tests.
+4. Open a **draft** PR early; mark ready when you want review.
+5. Do not commit `data/lan/*` (except `.gitkeep`), `frontend/dump.rdb`, or a root `package-lock.json`. Frontend lockfile lives in `frontend/`.
+
+## Style
+
+- Python: PEP 8, Django layout as in `backend_django/`.
+- React: existing component folders (`dashboards`, `hosts`, `devices`, `settings`).
+- Docs: Docker-first, `/api/inventory/hosts/`, health at `/api/health/`.
