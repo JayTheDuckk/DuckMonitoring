@@ -3,6 +3,9 @@
 # Duck Monitoring - Unified Startup Script
 # Sets up dependencies (first run), starts Redis if needed, then backend, Celery, and frontend.
 #
+# Local/dev startup (venv + Redis + Django + Celery + CRA).
+# For the supported deploy path use: ./scripts/docker-up.sh
+#
 # Usage:
 #   ./scripts/start.sh              Normal startup (idempotent)
 #   ./scripts/start.sh --reset      Wipe database and run fresh setup
@@ -160,7 +163,7 @@ start_celery() {
 }
 
 start_frontend() {
-    if pgrep -f "react-scripts start" >/dev/null; then
+    if pgrep -f "vite" >/dev/null; then
         echo -e "${YELLOW}Frontend: already running${NC}"
         return 0
     fi

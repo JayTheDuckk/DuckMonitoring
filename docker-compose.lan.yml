@@ -1,0 +1,42 @@
+# Optional Linux overlay: run the API on the host network so ping, ARP,
+# mDNS, and SSDP can see the LAN. Redis and Postgres stay on the compose network.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.lan.yml up -d
+#
+# On Docker Desktop (macOS/Windows) host networking is limited — use
+# ./scripts/start.sh on the host if you need LAN discovery.
+
+services:
+  backend:
+    network_mode: host
+    extra_hosts:
+      - "db:127.0.0.1"
+      - "redis:127.0.0.1"
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-duck}:${POSTGRES_PASSWORD:-change-me}@127.0.0.1:5432/${POSTGRES_DB:-duck_monitoring}
+      CELERY_BROKER_URL: redis://127.0.0.1:6379/0
+      CELERY_RESULT_BACKEND: redis://127.0.0.1:6379/0
+    depends_on: []
+
+  celery-worker:
+    network_mode: host
+    extra_hosts:
+      - "db:127.0.0.1"
+      - "redis:127.0.0.1"
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-duck}:${POSTGRES_PASSWORD:-change-me}@127.0.0.1:5432/${POSTGRES_DB:-duck_monitoring}
+      CELERY_BROKER_URL: redis://127.0.0.1:6379/0
+      CELERY_RESULT_BACKEND: redis://127.0.0.1:6379/0
+    depends_on: []
+
+  db:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  frontend:
+    extra_hosts:
+      - "backend:host-gateway"

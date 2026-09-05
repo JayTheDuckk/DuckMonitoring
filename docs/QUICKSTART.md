@@ -1,10 +1,18 @@
 # Quick Start Guide
 
-Get up and running with Duck Monitoring in minutes!
+Get up and running with Duck Monitoring in minutes.
 
-## 1. Start Everything
+## 1. Start with Docker (recommended)
 
-One script does it all — setup, Redis, backend, Celery, and frontend:
+```bash
+./scripts/docker-up.sh
+```
+
+This starts Postgres, Redis, the API, Celery, and the UI. Open `http://localhost:3000` and create your admin user.
+
+Details: [DOCKER_QUICKSTART.md](DOCKER_QUICKSTART.md).
+
+## 2. Or start locally (dev / LAN discovery on a Mac)
 
 ```bash
 ./scripts/start.sh
@@ -18,14 +26,24 @@ On first run it will automatically:
 - Start the API on `http://localhost:8000`
 - Start the Web UI on `http://localhost:3000`
 
-## 2. Initial Browser Setup
+## 3. Initial Browser Setup
 
 Once the script finishes:
 1. Open your browser to `http://localhost:3000`
 2. You will be redirected to the **Setup** page
 3. Create your first administrative user account
 
-## 3. Daily Use
+## 4. Daily Use
+
+Docker:
+
+```bash
+./scripts/docker-up.sh
+./scripts/docker-down.sh
+docker compose logs -f
+```
+
+Local/dev:
 
 ```bash
 ./scripts/start.sh    # Start everything
@@ -39,7 +57,7 @@ To wipe the database and start fresh:
 ./scripts/start.sh --reset
 ```
 
-## 4. Start an Agent
+## 5. Start an Agent
 
 In another terminal:
 
@@ -53,7 +71,7 @@ python agent.py --server http://localhost:8000
 
 Or use Docker test hosts — see [../docker/README.md](../docker/README.md).
 
-## 5. View Your Dashboard
+## 6. View Your Dashboard
 
 Open `http://localhost:3000` to see:
 - Registered hosts and real-time status
@@ -71,7 +89,8 @@ Open `http://localhost:3000` to see:
 - Check Celery logs: `/tmp/duck-monitoring-celery.log`
 
 **Frontend won't connect:**
-- Verify backend is running: `curl http://localhost:8000/api/health/`
+- Docker: `curl http://localhost:3000/api/health/`
+- Local/dev: `curl http://localhost:8000/api/health/`
 - Check browser console for errors
 
 **Agent won't register:**

@@ -10,7 +10,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-if pgrep -f "react-scripts start" >/dev/null; then
+if pgrep -f "vite" >/dev/null; then
     echo -e "${YELLOW}Frontend server is already running${NC}"
     exit 0
 fi
