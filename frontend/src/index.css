@@ -66,9 +66,9 @@ samp {
   --bg-hover: #dde5d8;
   --bg-input: #f3f6f0;
 
-  --text-primary: #1a2419;
-  --text-secondary: #4a5748;
-  --text-muted: #73806f;
+  --text-primary: #121a11;
+  --text-secondary: #354233;
+  --text-muted: #5a6757;
 
   --accent-primary: #3d6b42;
   --accent-secondary: #2f5434;
@@ -109,9 +109,9 @@ samp {
   --bg-hover: #232a23;
   --bg-input: #111411;
 
-  --text-primary: #e6f2e0;
-  --text-secondary: #b7c8b1;
-  --text-muted: #8a9b84;
+  --text-primary: #f4f8f0;
+  --text-secondary: #d4ddd0;
+  --text-muted: #b0bbaa;
 
   --accent-primary: #8fb887;
   --accent-secondary: #6f9a68;
