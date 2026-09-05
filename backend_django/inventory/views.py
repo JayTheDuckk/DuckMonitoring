@@ -1,7 +1,14 @@
+from datetime import timedelta
+
+from django.utils import timezone
 from rest_framework import viewsets, permissions, status, views
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Host, HostGroup, UPSDevice, SNMPDevice
+from .models import (
+    Host, HostGroup, UPSDevice, SNMPDevice, DeviceObservation,
+    apply_host_identity, observation_as_host, observation_matches_network,
+    upsert_observation,
+)
 from .serializers import (
     HostSerializer, HostGroupSerializer, 
     UPSDeviceSerializer, SNMPDeviceSerializer
@@ -133,8 +140,25 @@ class SNMPDeviceViewSet(viewsets.ModelViewSet):
         check_snmp_device.delay(device.id)
         return Response({'status': 'Check queued'}, status=status.HTTP_202_ACCEPTED)
 
+STALE_OBSERVATION_DAYS = 14
+
+
 class DiscoveryViewSet(viewsets.ViewSet):
     permission_classes = (permissions.IsAuthenticated,)
+
+    def _merge_stale_observations(self, result, network, now, scanned_ips):
+        cutoff = now - timedelta(days=STALE_OBSERVATION_DAYS)
+        candidates = DeviceObservation.objects.filter(last_seen__gte=cutoff).exclude(
+            ip_address__in=scanned_ips
+        )
+        stale_hosts = []
+        for observation in candidates:
+            if not observation_matches_network(observation, network):
+                continue
+            stale_hosts.append(observation_as_host(observation, seen_this_scan=False))
+        if stale_hosts:
+            result['hosts'] = list(result.get('hosts') or []) + stale_hosts
+        return result
     
     @action(detail=False, methods=['post'])
     def scan(self, request):
@@ -147,7 +171,31 @@ class DiscoveryViewSet(viewsets.ViewSet):
         result = perform_discovery(network, scan_ports=scan_ports)
         if 'error' in result:
             return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+        now = timezone.now()
+        scanned_ips = set()
+        for host in result.get('hosts') or []:
+            observation = upsert_observation(host, network, now=now)
+            host['first_seen'] = observation.first_seen.isoformat() if observation.first_seen else now.isoformat()
+            host['last_seen'] = observation.last_seen.isoformat() if observation.last_seen else now.isoformat()
+            host['seen_this_scan'] = True
+            if host.get('ip_address'):
+                scanned_ips.add(host['ip_address'])
+
+        self._merge_stale_observations(result, network, now, scanned_ips)
         return Response(result)
+
+    @action(detail=False, methods=['get'])
+    def history(self, request):
+        network = request.query_params.get('network')
+        cutoff = timezone.now() - timedelta(days=STALE_OBSERVATION_DAYS)
+        observations = DeviceObservation.objects.filter(last_seen__gte=cutoff).order_by('-last_seen')
+        hosts = []
+        for observation in observations:
+            if network and not observation_matches_network(observation, network):
+                continue
+            hosts.append(observation_as_host(observation, seen_this_scan=False))
+        return Response({'hosts': hosts})
 
     @action(detail=False, methods=['post'])
     def import_hosts(self, request):
@@ -160,24 +208,23 @@ class DiscoveryViewSet(viewsets.ViewSet):
         gateway_ip = get_default_gateway()
         
         created_hosts = []
+        now = timezone.now()
         
         for host_data in hosts_data:
             ip = host_data.get('ip_address')
             hostname = host_data.get('mdns_name') or host_data.get('hostname') or ip
             
-            # Check if exists, update detailed info if so
-            # mac_address and vendor are passed from frontend (which got them from discovery)
-            defaults = {
-                'hostname': hostname,
-                'status': 'up',
-                'mac_address': host_data.get('mac_address'),
-                'vendor': host_data.get('vendor') if host_data.get('mac_type') == 'manufacturer' or host_data.get('vendor_source') in ('mdns_guess', 'ssdp_guess') else None,
-            }
-            
-            host, created = Host.objects.update_or_create(
-                ip_address=ip,
-                defaults=defaults
-            )
+            host = Host.objects.filter(ip_address=ip).first()
+            created = host is None
+            if created:
+                host = Host(ip_address=ip, hostname=hostname, status='up')
+            else:
+                host.status = 'up'
+
+            host.mac_address = host_data.get('mac_address')
+            host.vendor = host_data.get('vendor') if host_data.get('mac_type') == 'manufacturer' or host_data.get('vendor_source') in ('mdns_guess', 'ssdp_guess') else None
+            apply_host_identity(host, host_data, now=now, created=created)
+            host.save()
             
             if created:
                 # Auto-create Ping check
