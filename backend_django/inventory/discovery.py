@@ -8,37 +8,26 @@ import ipaddress
 import concurrent.futures
 from datetime import datetime
 import platform
+import re
 from typing import List, Dict, Optional, Tuple
 
+from core.utils.mac_vendor import research_mac
+from core.utils.device_fingerprint import fingerprint_device, FINGERPRINT_PORTS
+from core.utils.mdns_resolver import discover_mdns_hosts, lookup_mdns_for_ip
+
 COMMON_PORTS = {
-    22: 'SSH',
-    80: 'HTTP',
-    443: 'HTTPS',
-    21: 'FTP',
-    23: 'Telnet',
-    25: 'SMTP',
-    53: 'DNS',
-    3306: 'MySQL',
-    5432: 'PostgreSQL',
-    6379: 'Redis',
-    3389: 'RDP',
-    161: 'SNMP',
+    **FINGERPRINT_PORTS,
 }
 
-def ping_host(ip: str, timeout: int = 1) -> Tuple[bool, Optional[float]]:
+def ping_host(ip: str, timeout: int = 1) -> Tuple[bool, Optional[float], Optional[int]]:
     try:
         param = '-n' if platform.system().lower() == 'windows' else '-c'
-        # macOS/BSD uses -W in ms, Linux -W in seconds commonly, but some versions differ.
         if platform.system().lower() == 'darwin':
              timeout_arg = str(timeout * 1000) # ms
         else:
              timeout_arg = str(timeout) # seconds
 
         timeout_flag = '-W' if platform.system().lower() != 'windows' else '-w'
-        
-        # On Linux -W is usually seconds. On macOS it is ms.
-        # Let's try to be safe or use what worked before.
-        # Original code used generic logic.
         
         args = ['ping', param, '1', timeout_flag, timeout_arg, str(ip)]
         
@@ -50,12 +39,17 @@ def ping_host(ip: str, timeout: int = 1) -> Tuple[bool, Optional[float]]:
             timeout=timeout + 1
         )
         elapsed = (datetime.now() - start).total_seconds() * 1000
+        combined_output = (result.stdout or '') + (result.stderr or '')
+        ttl = None
+        ttl_match = re.search(r'\bttl=(\d+)', combined_output, re.IGNORECASE)
+        if ttl_match:
+            ttl = int(ttl_match.group(1))
         
         if result.returncode == 0:
-            return True, round(elapsed, 2)
-        return False, None
+            return True, round(elapsed, 2), ttl
+        return False, None, ttl
     except Exception:
-        return False, None
+        return False, None, None
 
 def check_port(ip: str, port: int, timeout: float = 0.5) -> bool:
     try:
@@ -146,20 +140,23 @@ def get_active_hosts_from_arp() -> Dict[str, str]:
         pass
     return active_hosts
 
-def discover_host(ip: str, scan_ports: bool = True, known_mac: str = None) -> Optional[Dict]:
-    # 1. ARP Check (if provided)
+def discover_host(
+    ip: str,
+    scan_ports: bool = True,
+    known_mac: str = None,
+    mdns_map: Optional[Dict] = None,
+) -> Optional[Dict]:
+    ping_ttl = None
     if known_mac:
         is_alive = True
         latency = 0
     else:
-        # 2. ICMP Ping
-        is_alive, latency = ping_host(ip)
+        is_alive, latency, ping_ttl = ping_host(ip)
         
-        # 3. TCP Fallback (if ping failed)
         if not is_alive:
             if check_tcp_liveness(ip):
                 is_alive = True
-                latency = 0 # Can't easily measure without ping, assume 0 or small
+                latency = 0
             else:
                 return None
 
@@ -170,21 +167,63 @@ def discover_host(ip: str, scan_ports: bool = True, known_mac: str = None) -> Op
         'hostname': get_hostname(ip),
         'services': [],
         'suggested_type': 'unknown',
-        'mac_address': known_mac
+        'mac_address': known_mac,
     }
+
+    mdns_record = lookup_mdns_for_ip(ip, mdns_map)
+    if mdns_record:
+        host_info['mdns_name'] = mdns_record.friendly_name
+        host_info['mdns_hostname'] = mdns_record.hostname
+        host_info['mdns_services'] = mdns_record.services
+        host_info['apple_model'] = mdns_record.apple_model
+        if not host_info.get('hostname'):
+            host_info['hostname'] = mdns_record.hostname
+        elif mdns_record.friendly_name and host_info['hostname'] == ip:
+            host_info['hostname'] = mdns_record.hostname
     
     if scan_ports:
         host_info['services'] = scan_host_ports(ip)
-        host_info['suggested_type'] = guess_host_type(host_info['services'])
     
-    # Try to get MAC address if not already known
     if not host_info.get('mac_address'):
         mac = get_mac_address(ip)
         if mac:
             host_info['mac_address'] = mac
 
+    vendor = None
+    mac_type = None
     if host_info.get('mac_address'):
-        host_info['vendor'] = get_vendor(host_info['mac_address'])
+        research = research_mac(
+            host_info['mac_address'],
+            hostname=host_info.get('hostname'),
+            suggested_type=host_info.get('suggested_type'),
+            services=host_info.get('services'),
+        )
+        host_info['vendor'] = research['vendor']
+        host_info['mac_type'] = research['mac_type']
+        host_info['vendor_source'] = research['vendor_source']
+        host_info['device_hint'] = research['device_hint']
+        vendor = research['vendor']
+        mac_type = research['mac_type']
+
+    fingerprint = fingerprint_device(
+        ip,
+        hostname=host_info.get('mdns_name') or host_info.get('hostname'),
+        services=host_info.get('services'),
+        mac_type=mac_type,
+        vendor=vendor,
+        ping_ttl=ping_ttl,
+        mdns=mdns_record.to_dict() if mdns_record else None,
+        deep_probe=scan_ports,
+    )
+    host_info.update(fingerprint.to_dict())
+
+    # Enrich device hint with OS guess when we have private/unknown MACs
+    if mac_type in ('private', 'unknown') and fingerprint.os_guess != 'Unknown':
+        clue = f"Likely {fingerprint.os_guess} ({fingerprint.confidence} confidence)"
+        if host_info.get('device_hint'):
+            host_info['device_hint'] = f"{host_info['device_hint']} · {clue}"
+        else:
+            host_info['device_hint'] = clue
 
     return host_info
 
@@ -194,14 +233,13 @@ def perform_discovery(network: str, scan_ports: bool = True, max_workers: int = 
     except ValueError as e:
         return {'error': str(e)}
         
-    # Pre-scan ARP table for local discovery
     arp_hosts = get_active_hosts_from_arp()
+    mdns_map = discover_mdns_hosts(timeout=5.0 if scan_ports else 3.0)
     
     discovered = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Pass known_mac if IP is in ARP table
         future_to_ip = {
-            executor.submit(discover_host, ip, scan_ports, arp_hosts.get(ip)): ip 
+            executor.submit(discover_host, ip, scan_ports, arp_hosts.get(ip), mdns_map): ip 
             for ip in ips_list
         }
         for future in concurrent.futures.as_completed(future_to_ip):
@@ -212,7 +250,7 @@ def perform_discovery(network: str, scan_ports: bool = True, max_workers: int = 
             except:
                 pass
                 
-    return {'hosts': discovered}
+    return {'hosts': discovered, 'mdns_devices_found': len(mdns_map)}
 
 def get_mac_address(ip: str) -> Optional[str]:
     """
@@ -273,36 +311,6 @@ def get_default_gateway() -> Optional[str]:
     except:
         pass
     return None
-
-def get_vendor(mac: str) -> Optional[str]:
-    """
-    Simple OUI lookup for common vendors.
-    """
-    if not mac: return None
-    prefix = mac.replace(':', '').upper()[:6]
-    
-    # Common OUIs (Small subset)
-    vendors = {
-        '000C29': 'VMware',
-        '005056': 'VMware',
-        'B827EB': 'Raspberry Pi',
-        'DC1A72': 'Raspberry Pi',
-        'E45F01': 'Raspberry Pi',
-        '00155D': 'Microsoft',
-        '001132': 'Synology',
-        '001124': 'Apple', # Old
-        '186590': 'Apple', # Example
-        'FCFC48': 'Apple',
-        '0018E7': 'Cameo (Ubiquiti?)', 
-        '7483C2': 'Ubiquiti',
-        'F09FC2': 'Ubiquiti',
-        '602232': 'Ubiquiti', # Unifi
-        'B4FBE4': 'Ubiquiti',
-        '802AA8': 'Ubiquiti', 
-        '44D9E7': 'Ubiquiti', # Networking
-    }
-    # This list is tiny. In production use an API or large DB.
-    return vendors.get(prefix, 'Unknown Vendor')
 
 def parse_network_range(network: str) -> List[str]:
     ips = []

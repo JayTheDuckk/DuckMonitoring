@@ -75,3 +75,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# MAC vendor OUI cache (downloaded via manage.py update_mac_vendors)
+backend_django/data/mac_vendors.txt
+backend_django/data/mac_research_cache.json
+

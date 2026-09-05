@@ -2,6 +2,8 @@ from celery import shared_task
 from django.utils import timezone
 from .models import DiscoveryScan, DiscoveredHost
 from inventory.discovery import discover_host, get_active_hosts_from_arp, parse_network_range
+from core.utils.mac_vendor import research_mac
+from core.utils.mdns_resolver import discover_mdns_hosts
 import logging
 
 logger = logging.getLogger(__name__)
@@ -45,20 +47,36 @@ def scan_network_task(scan_id):
         scan.save()
 
         arp_hosts = get_active_hosts_from_arp()
+        mdns_map = discover_mdns_hosts(timeout=5.0)
 
         for ip in ips_list:
             scan.scanned_hosts += 1
-            host_info = discover_host(ip, scan_ports=True, known_mac=arp_hosts.get(ip))
+            host_info = discover_host(ip, scan_ports=True, known_mac=arp_hosts.get(ip), mdns_map=mdns_map)
 
             if host_info:
+                research = research_mac(
+                    host_info.get('mac_address', ''),
+                    hostname=host_info.get('hostname'),
+                    suggested_type=host_info.get('suggested_type'),
+                    services=host_info.get('services'),
+                ) if host_info.get('mac_address') else {}
                 DiscoveredHost.objects.create(
                     scan=scan,
                     ip_address=host_info['ip_address'],
                     hostname=host_info.get('hostname'),
                     mac_address=host_info.get('mac_address'),
-                    manufacturer=host_info.get('vendor'),
-                    os_guess=HOST_TYPE_TO_OS.get(host_info.get('suggested_type'), 'Unknown'),
-                    open_ports=host_info.get('services', []),
+                    manufacturer=research.get('vendor') or host_info.get('vendor'),
+                    os_guess=host_info.get('os_guess') or HOST_TYPE_TO_OS.get(host_info.get('suggested_type'), 'Unknown'),
+                    open_ports={
+                        'services': host_info.get('services', []),
+                        'mac_type': research.get('mac_type'),
+                        'device_hint': host_info.get('device_hint'),
+                        'device_class': host_info.get('device_class'),
+                        'confidence': host_info.get('confidence'),
+                        'identification_clues': host_info.get('identification_clues', []),
+                        'mdns_name': host_info.get('mdns_name'),
+                        'apple_model': host_info.get('apple_model'),
+                    },
                     status='new',
                 )
                 scan.found_hosts += 1

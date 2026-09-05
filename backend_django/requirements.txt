@@ -12,3 +12,5 @@ django-filter>=25.0,<26
 ping3>=4.0.4,<5
 pysnmp>=7.0,<8
 requests>=2.32,<3
+mac-vendor-lookup>=0.1.15,<0.2
+zeroconf>=0.131.0,<1
