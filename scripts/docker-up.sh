@@ -64,8 +64,34 @@ if $REBUILD || $RESET; then
     UP_ARGS+=(--build)
 fi
 
+LAN_DIR="$PROJECT_ROOT/data/lan"
+mkdir -p "$LAN_DIR"
+
+start_lan_identity_collector() {
+    local pid_file="$LAN_DIR/collector.pid"
+    if [ -f "$pid_file" ]; then
+        local existing
+        existing="$(cat "$pid_file" 2>/dev/null || true)"
+        if [ -n "$existing" ] && kill -0 "$existing" 2>/dev/null; then
+            echo -e "${GREEN}✓ Host LAN identity collector already running${NC}"
+            return
+        fi
+    fi
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo -e "${YELLOW}python3 not found — Docker scans will not see host ARP/MAC.${NC}"
+        return
+    fi
+    nohup python3 "$PROJECT_ROOT/scripts/lan_identity.py" \
+        --out "$LAN_DIR/identity.json" \
+        --loop 30 \
+        >> "$LAN_DIR/collector.log" 2>&1 &
+    echo $! > "$pid_file"
+    echo -e "${GREEN}✓ Host LAN identity collector started (ARP → data/lan/identity.json)${NC}"
+}
+
 echo -e "${BOLD}Starting Duck Monitoring...${NC}"
 docker compose "${UP_ARGS[@]}"
+start_lan_identity_collector
 
 HTTP_PORT="$(grep -E '^HTTP_PORT=' .env 2>/dev/null | cut -d= -f2- || true)"
 HTTP_PORT="${HTTP_PORT:-3000}"
@@ -79,4 +105,4 @@ echo -e "  Logs:   docker compose logs -f"
 echo -e "  Stop:   ./scripts/docker-down.sh"
 echo ""
 echo -e "Open ${BOLD}http://localhost:${HTTP_PORT}${NC} to create your admin user."
-echo -e "${YELLOW}LAN discovery from Docker is limited on macOS. Use ./scripts/start.sh on the host if you need mDNS/ARP.${NC}"
+echo -e "${YELLOW}On macOS, a host collector publishes ARP so Discovery can show MAC, vendor, and names.${NC}"

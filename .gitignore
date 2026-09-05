@@ -79,3 +79,9 @@ yarn-error.log*
 backend_django/data/mac_vendors.txt
 backend_django/data/mac_research_cache.json
 
+# Host LAN identity cache (written by scripts/lan_identity.py)
+data/lan/identity.json
+data/lan/identity.json.tmp
+data/lan/*.log
+data/lan/*.pid
+

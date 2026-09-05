@@ -3,7 +3,7 @@
 }
 
 .host-detail-header {
-  margin-bottom: 2rem;
+  margin-bottom: 1.15rem;
   position: relative;
 }
 
@@ -59,10 +59,11 @@
 }
 
 .host-title-section h2 {
-  font-size: 2rem;
+  font-size: var(--title-size);
   color: var(--text-primary);
   margin: 0;
   font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
 .status-badge-large {

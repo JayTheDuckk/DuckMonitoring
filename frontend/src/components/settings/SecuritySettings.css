@@ -1,25 +1,25 @@
 .security-container {
-    padding: 2rem;
-    max-width: 800px;
-    margin: 0 auto;
+    padding: 0;
+    max-width: 48rem;
+    margin: 0;
 }
 
 .security-header {
-    margin-bottom: 2rem;
+    margin-bottom: 1.15rem;
 }
 
 .security-header h1 {
-    font-size: 2rem;
-    background: var(--accent-gradient);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin: 0 0 0.5rem 0;
+    font-size: var(--title-size);
+    color: var(--text-primary);
+    background: none;
+    -webkit-text-fill-color: inherit;
+    margin: 0;
 }
 
 .security-header .subtitle {
-    color: #6b7280;
-    margin: 0;
+    color: var(--text-secondary);
+    margin: 0.2rem 0 0;
+    font-size: var(--lede-size);
 }
 
 .security-loading {
@@ -394,10 +394,6 @@
 
 /* Responsive */
 @media (max-width: 640px) {
-    .security-container {
-        padding: 1rem;
-    }
-
     .card-header {
         flex-direction: column;
         gap: 0.75rem;

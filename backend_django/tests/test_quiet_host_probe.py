@@ -1,6 +1,10 @@
 from django.test import TestCase
 
-from core.utils.quiet_host_probe import describe_quiet_host, is_sparse_host
+from core.utils.quiet_host_probe import (
+    describe_quiet_host,
+    is_sparse_host,
+    stamp_privacy_device,
+)
 from core.utils.ssdp_resolver import _parse_ssdp_response, guess_vendor_from_ssdp, SsdpRecord
 
 
@@ -23,6 +27,37 @@ class QuietHostProbeTests(TestCase):
         self.assertIn('privacy/random MAC', text)
         self.assertIn('TTL 64', text)
         self.assertIn('High latency', text)
+        self.assertIn('expected, not a failed server', text)
+
+    def test_stamp_privacy_device_for_private_mac_without_name(self):
+        host = {
+            'mac_type': 'private',
+            'hostname': None,
+            'mdns_name': None,
+            'services': [],
+            'device_class': 'mobile',
+        }
+        stamped = stamp_privacy_device(host)
+        self.assertEqual(stamped['device_class'], 'privacy_device')
+        self.assertTrue(stamped['privacy_reason'])
+        self.assertIn(stamped['privacy_reason'], stamped['identification_clues'])
+
+    def test_stamp_privacy_device_skips_named_or_stronger_class(self):
+        named = stamp_privacy_device({
+            'mac_type': 'private',
+            'hostname': 'iphone.local',
+            'mdns_name': None,
+            'device_class': 'phone',
+        })
+        self.assertEqual(named['device_class'], 'phone')
+
+        router = stamp_privacy_device({
+            'mac_type': 'private',
+            'hostname': None,
+            'mdns_name': None,
+            'device_class': 'router',
+        })
+        self.assertEqual(router['device_class'], 'router')
 
 
 class SsdpResolverTests(TestCase):

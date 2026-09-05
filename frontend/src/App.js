@@ -20,12 +20,15 @@ import CustomDashboard from './components/dashboards/CustomDashboard';
 import HostDiscovery from './components/hosts/HostDiscovery';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import TopologyGraph from './components/NetworkMap/TopologyGraph';
+import { DuckMark, GridIcon, ListIcon, MoonIcon, ShieldIcon, SunIcon, UsersIcon } from './components/common/Icons';
 
 import './App.css';
 
 const Navbar = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [hardwareOpen, setHardwareOpen] = React.useState(false);
+  const hardwareRef = React.useRef(null);
 
   // Theme state
   const [theme, setTheme] = React.useState(() => {
@@ -35,7 +38,34 @@ const Navbar = () => {
   React.useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    if (themeColor) {
+      themeColor.setAttribute('content', theme === 'dark' ? '#111411' : '#3d6b42');
+    }
   }, [theme]);
+
+  React.useEffect(() => {
+    if (!hardwareOpen) return;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setHardwareOpen(false);
+      }
+    };
+
+    const handlePointerDown = (event) => {
+      if (hardwareRef.current && !hardwareRef.current.contains(event.target)) {
+        setHardwareOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handlePointerDown);
+    };
+  }, [hardwareOpen]);
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
@@ -43,10 +73,12 @@ const Navbar = () => {
 
   const handleLogout = async () => {
     setMenuOpen(false);
+    setHardwareOpen(false);
     await logout();
   };
 
   const closeMenu = () => setMenuOpen(false);
+  const closeHardware = () => setHardwareOpen(false);
 
   if (!isAuthenticated) {
     return null;
@@ -58,18 +90,40 @@ const Navbar = () => {
     <nav className="navbar">
       <div className="nav-container">
         <Link to="/" className="nav-logo">
+          <DuckMark size={38} />
           <h1 className="nav-logo-text">Duck Monitoring</h1>
         </Link>
 
         {/* Main Navigation - Essential Items */}
         <div className="nav-menu">
           <Link to="/" className="nav-link">Dashboard</Link>
-          <Link to="/ups" className="nav-link">UPS</Link>
-          <Link to="/snmp" className="nav-link">SNMP</Link>
+          <Link to="/discovery" className="nav-link">Discovery</Link>
+          <div className="nav-submenu" ref={hardwareRef}>
+            <button
+              type="button"
+              className="nav-submenu-trigger"
+              aria-expanded={hardwareOpen}
+              aria-haspopup="true"
+              onClick={() => setHardwareOpen((open) => !open)}
+            >
+              Hardware
+            </button>
+            {hardwareOpen && (
+              <div className="nav-submenu-panel" role="menu">
+                <Link to="/ups" className="nav-submenu-link" role="menuitem" onClick={closeHardware}>
+                  UPS
+                </Link>
+                <Link to="/snmp" className="nav-submenu-link" role="menuitem" onClick={closeHardware}>
+                  SNMP
+                </Link>
+              </div>
+            )}
+          </div>
           <Link to="/topology" className="nav-link">Topology</Link>
           <Link to="/alerts" className="nav-link">Alerts</Link>
         </div>
 
+        <div className="nav-end">
         <div className="nav-user">
           <span className="nav-username">{user?.username}</span>
 
@@ -120,27 +174,25 @@ const Navbar = () => {
                       gap: '0.75rem'
                     }}
                   >
-                    {theme === 'light' ? '🌙 Dark Mode' : '☀️ Light Mode'}
+                    {theme === 'light' ? <MoonIcon /> : <SunIcon />}
+                    {theme === 'light' ? 'Dark mode' : 'Light mode'}
                   </button>
                   <Link to="/dashboards" className="nav-dropdown-link" onClick={closeMenu}>
-                    📊 My Dashboards
+                    <GridIcon /> My dashboards
                   </Link>
                   <Link to="/security" className="nav-dropdown-link" onClick={closeMenu}>
-                    🔐 Security Settings
+                    <ShieldIcon /> Security
                   </Link>
                 </div>
 
                 {isAdmin && (
                   <div className="nav-dropdown-section">
                     <div className="nav-dropdown-label">Administration</div>
-                    <Link to="/discovery" className="nav-dropdown-link" onClick={closeMenu}>
-                      🔍 Network Discovery
-                    </Link>
                     <Link to="/users" className="nav-dropdown-link" onClick={closeMenu}>
-                      👥 User Management
+                      <UsersIcon /> Users
                     </Link>
                     <Link to="/audit-logs" className="nav-dropdown-link" onClick={closeMenu}>
-                      📋 Audit Logs
+                      <ListIcon /> Audit log
                     </Link>
                   </div>
                 )}
@@ -153,6 +205,7 @@ const Navbar = () => {
               </div>
             </>
           )}
+        </div>
         </div>
       </div>
     </nav>

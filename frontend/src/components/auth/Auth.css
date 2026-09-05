@@ -70,13 +70,12 @@
 
 .auth-header h1 {
   font-size: 2.5rem;
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-primary);
+  background: none;
+  -webkit-text-fill-color: inherit;
   margin: 0 0 0.75rem 0;
   font-weight: 700;
-  letter-spacing: -0.5px;
+  letter-spacing: 0;
 }
 
 .auth-header p {
@@ -289,4 +288,89 @@
 .back-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.setup-steps {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.4rem;
+  margin: -1rem 0 2rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.setup-step-sep {
+  color: var(--text-muted);
+}
+
+.setup-step {
+  color: var(--text-secondary);
+}
+
+.setup-step.is-active {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.setup-step.is-done {
+  color: var(--accent-primary);
+}
+
+.auth-card.setup-card-wide {
+  max-width: 520px;
+}
+
+.setup-help {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.setup-host-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.setup-host-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.setup-host-item.is-selected {
+  border-color: var(--accent-primary);
+}
+
+.setup-host-item input {
+  margin-top: 0.25rem;
+  accent-color: var(--accent-primary);
+}
+
+.setup-host-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.setup-host-name {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.setup-host-detail {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
 }

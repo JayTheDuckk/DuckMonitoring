@@ -63,6 +63,11 @@ def deep_probe_quiet_host(ip: str, check_port: Callable[[str, int, float], bool]
     }
 
 
+STRONGER_DEVICE_CLASSES = frozenset({
+    'router', 'server', 'printer', 'tv', 'network_device',
+})
+
+
 def describe_quiet_host(host_info: Dict) -> str:
     """Human-readable summary of what we could and could not learn."""
     ttl = host_info.get('ping_ttl')
@@ -75,7 +80,7 @@ def describe_quiet_host(host_info: Dict) -> str:
         parts.append('Uses a privacy/random MAC')
     if ttl is not None:
         if ttl <= 64:
-            parts.append(f'Responds to ping (TTL {ttl}, typical of Linux/macOS/iOS/Android)')
+            parts.append(f'Responds to ping (TTL {ttl} — Unix-like; not enough to tell Linux from macOS or Android)')
         elif ttl <= 128:
             parts.append(f'Responds to ping (TTL {ttl}, typical of Windows)')
         else:
@@ -89,6 +94,45 @@ def describe_quiet_host(host_info: Dict) -> str:
     if not host_info.get('mdns_name'):
         parts.append('No mDNS/Bonjour advertisement during scan window')
 
+    if mac_type == 'private' or is_sparse_host(host_info):
+        parts.append('Phones often hide from LAN scans; this is expected, not a failed server')
+
     if not parts:
         return 'Limited discovery signals — device may only allow outbound connections'
     return ' · '.join(parts)
+
+
+def _has_advertised_name(host_info: Dict) -> bool:
+    hostname = (host_info.get('hostname') or '').strip()
+    mdns_name = (host_info.get('mdns_name') or '').strip()
+    return bool(hostname or mdns_name)
+
+
+def should_mark_privacy_device(host_info: Dict) -> bool:
+    """True when an unnamed private or sparse host should not look like a server."""
+    if _has_advertised_name(host_info):
+        return False
+    if host_info.get('device_class') in STRONGER_DEVICE_CLASSES:
+        return False
+    return host_info.get('mac_type') == 'private' or is_sparse_host(host_info)
+
+
+def stamp_privacy_device(host_info: Dict) -> Dict:
+    """
+    Mark unnamed private-MAC / sparse hosts as privacy devices.
+
+    Phones hide from scans; this is expected, not a down server.
+    Stronger classes (router/server/printer/tv) already won are left alone.
+    """
+    if not should_mark_privacy_device(host_info):
+        return host_info
+
+    reason = describe_quiet_host(host_info)
+    host_info['device_class'] = 'privacy_device'
+    host_info['privacy_reason'] = reason
+    host_info['suggested_type'] = 'privacy_device'
+    clues = list(host_info.get('identification_clues') or [])
+    if reason and reason not in clues:
+        clues.insert(0, reason)
+    host_info['identification_clues'] = clues
+    return host_info

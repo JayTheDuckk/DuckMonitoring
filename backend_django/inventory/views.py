@@ -1,13 +1,21 @@
+from datetime import timedelta
+
+from django.utils import timezone
 from rest_framework import viewsets, permissions, status, views
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Host, HostGroup, UPSDevice, SNMPDevice
+from .models import (
+    Host, HostGroup, UPSDevice, SNMPDevice, DeviceObservation, LanWatchSettings,
+    apply_imported_host_identity, apply_observation_identity,
+    observation_as_host, observation_matches_network, upsert_observation,
+)
+from .watch import import_or_update_host, sync_hosts_from_observations, watch_status
 from .serializers import (
     HostSerializer, HostGroupSerializer, 
     UPSDeviceSerializer, SNMPDeviceSerializer
 )
 from monitoring.models import ServiceCheckResult, Metric, ServiceCheckConfig
-from .discovery import perform_discovery
+from .discovery import apply_lan_identity_to_host, load_lan_identity_cache, perform_discovery
 
 # Import OID definitions
 from core.snmp_oids import SNMP_DEVICE_MODELS
@@ -20,10 +28,34 @@ class HostViewSet(viewsets.ModelViewSet):
     ViewSet for managing Hosts.
     Includes filtering by status and group.
     """
-    queryset = Host.objects.all()
+    queryset = Host.objects.all().prefetch_related('service_checks')
     serializer_class = HostSerializer
     permission_classes = (permissions.IsAuthenticated,)
     filterset_fields = ('status', 'group')
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        from .discovery import load_lan_identity_cache
+
+        ips = list(
+            self.get_queryset().exclude(ip_address__isnull=True).values_list('ip_address', flat=True)
+        )
+        context['observations'] = {
+            observation.ip_address: observation
+            for observation in DeviceObservation.objects.filter(ip_address__in=ips)
+        }
+        context['lan_cache'] = load_lan_identity_cache()
+        return context
+
+    @action(detail=False, methods=['post'], url_path='clear-ungrouped')
+    def clear_ungrouped(self, request):
+        is_admin = request.user.is_superuser or getattr(request.user, 'role', None) == 'admin' or getattr(request.user, 'is_admin', False)
+        if not is_admin:
+            return Response({'error': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
+        qs = Host.objects.filter(group__isnull=True)
+        count = qs.count()
+        qs.delete()
+        return Response({'deleted': count})
 
     @action(detail=True, methods=['delete'], url_path='clear-history')
     def clear_history(self, request, pk=None):
@@ -133,8 +165,41 @@ class SNMPDeviceViewSet(viewsets.ModelViewSet):
         check_snmp_device.delay(device.id)
         return Response({'status': 'Check queued'}, status=status.HTTP_202_ACCEPTED)
 
+STALE_OBSERVATION_DAYS = 14
+HOST_DOWN_CONDITION = {"field": "status", "operator": "equals", "value": "critical"}
+
+
+def _ensure_host_down_rule(host):
+    from alerts.models import AlertRule
+
+    if AlertRule.objects.filter(host=host, condition_type='host_down').exists():
+        return False
+    AlertRule.objects.create(
+        name=f"{host.hostname} down",
+        condition_type='host_down',
+        condition=HOST_DOWN_CONDITION,
+        severity='critical',
+        host=host,
+    )
+    return True
+
+
 class DiscoveryViewSet(viewsets.ViewSet):
     permission_classes = (permissions.IsAuthenticated,)
+
+    def _merge_stale_observations(self, result, network, now, scanned_ips):
+        cutoff = now - timedelta(days=STALE_OBSERVATION_DAYS)
+        candidates = DeviceObservation.objects.filter(last_seen__gte=cutoff).exclude(
+            ip_address__in=scanned_ips
+        )
+        stale_hosts = []
+        for observation in candidates:
+            if not observation_matches_network(observation, network):
+                continue
+            stale_hosts.append(observation_as_host(observation, seen_this_scan=False))
+        if stale_hosts:
+            result['hosts'] = list(result.get('hosts') or []) + stale_hosts
+        return result
     
     @action(detail=False, methods=['post'])
     def scan(self, request):
@@ -147,68 +212,127 @@ class DiscoveryViewSet(viewsets.ViewSet):
         result = perform_discovery(network, scan_ports=scan_ports)
         if 'error' in result:
             return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+        now = timezone.now()
+        scanned_ips = set()
+        for host in result.get('hosts') or []:
+            observation = upsert_observation(host, network, now=now)
+            apply_observation_identity(host, observation, seen_this_scan=True)
+            if host.get('ip_address'):
+                scanned_ips.add(host['ip_address'])
+
+        imported_by_ip = {
+            host.ip_address: host
+            for host in Host.objects.filter(ip_address__in=scanned_ips)
+        }
+        identity_cache = load_lan_identity_cache()
+        for host in result.get('hosts') or []:
+            apply_imported_host_identity(host, imported_by_ip.get(host.get('ip_address')))
+            apply_lan_identity_to_host(host, identity_cache)
+
+        self._merge_stale_observations(result, network, now, scanned_ips)
+        for host in result.get('hosts') or []:
+            apply_lan_identity_to_host(host, identity_cache)
         return Response(result)
+
+    @action(detail=False, methods=['get'])
+    def history(self, request):
+        network = request.query_params.get('network')
+        cutoff = timezone.now() - timedelta(days=STALE_OBSERVATION_DAYS)
+        observations = DeviceObservation.objects.filter(last_seen__gte=cutoff).order_by('-last_seen')
+        hosts = []
+        identity_cache = load_lan_identity_cache()
+        for observation in observations:
+            if network and not observation_matches_network(observation, network):
+                continue
+            host = observation_as_host(observation, seen_this_scan=False)
+            apply_lan_identity_to_host(host, identity_cache)
+            hosts.append(host)
+        return Response({'hosts': hosts})
+
+    @action(detail=False, methods=['get'])
+    def changes(self, request):
+        """
+        Week-over-week discovery diff (default 7 days).
+
+        new: first_seen >= since
+        gone: first_seen < since (they used to be around), last_seen older than
+              max(since, now-24h), and last_seen still within 30 days
+        unnamed_mobile: device_class is privacy_device, mobile, or phone and
+                        there is no mdns_name
+        """
+        try:
+            days = int(request.query_params.get('days', 7))
+        except (TypeError, ValueError):
+            days = 7
+        days = max(1, min(days, 90))
+        network = request.query_params.get('network')
+        now = timezone.now()
+        since = now - timedelta(days=days)
+        gone_cutoff = max(since, now - timedelta(hours=24))
+        recent_floor = now - timedelta(days=30)
+        unnamed_classes = {'privacy_device', 'mobile', 'phone'}
+
+        new_hosts = []
+        gone_hosts = []
+        unnamed_mobile = []
+
+        for observation in DeviceObservation.objects.all():
+            if network and not observation_matches_network(observation, network):
+                continue
+            if not observation.first_seen or not observation.last_seen:
+                continue
+
+            host = observation_as_host(observation, seen_this_scan=False)
+            if observation.first_seen >= since:
+                new_hosts.append(host)
+            elif (
+                observation.last_seen < gone_cutoff
+                and observation.last_seen >= recent_floor
+            ):
+                gone_hosts.append(host)
+
+            device_class = (observation.device_class or host.get('device_class') or '').lower()
+            mdns_name = observation.mdns_name or host.get('mdns_name')
+            if device_class in unnamed_classes and not mdns_name:
+                unnamed_mobile.append(host)
+
+        return Response({
+            'since': since.isoformat(),
+            'new': new_hosts,
+            'gone': gone_hosts,
+            'unnamed_mobile': unnamed_mobile,
+        })
 
     @action(detail=False, methods=['post'])
     def import_hosts(self, request):
+        from alerts.pack import ensure_default_alert_pack
+
+        ensure_default_alert_pack()
         hosts_data = request.data.get('hosts', [])
         imported_count = 0
         service_checks_created = 0
+        alerts_created = 0
         
         # Detect Gateway for topology
         from .discovery import get_default_gateway
         gateway_ip = get_default_gateway()
         
         created_hosts = []
+        now = timezone.now()
         
         for host_data in hosts_data:
-            ip = host_data.get('ip_address')
-            hostname = host_data.get('mdns_name') or host_data.get('hostname') or ip
-            
-            # Check if exists, update detailed info if so
-            # mac_address and vendor are passed from frontend (which got them from discovery)
-            defaults = {
-                'hostname': hostname,
-                'status': 'up',
-                'mac_address': host_data.get('mac_address'),
-                'vendor': host_data.get('vendor') if host_data.get('mac_type') == 'manufacturer' or host_data.get('vendor_source') in ('mdns_guess', 'ssdp_guess') else None,
-            }
-            
-            host, created = Host.objects.update_or_create(
-                ip_address=ip,
-                defaults=defaults
+            host, created, host_alerts, host_services = import_or_update_host(
+                dict(host_data),
+                now=now,
+                add_services=True,
             )
-            
+            if host is None:
+                continue
             if created:
-                # Auto-create Ping check
-                ServiceCheckConfig.objects.create(
-                    host=host,
-                    check_type='ping',
-                    check_name='Ping Check',
-                    interval=60,
-                    enabled=True,
-                    parameters={'count': 3}
-                )
                 imported_count += 1
-            
-            # Create service checks for selected services
-            for service in host_data.get('services', []):
-                svc_name = service.get('service', 'unknown')
-                svc_port = service.get('port')
-                
-                # Check if exists to avoid duplicates on re-import
-                if svc_port:
-                    if not ServiceCheckConfig.objects.filter(host=host, check_type=svc_name, parameters__port=svc_port).exists():
-                        ServiceCheckConfig.objects.create(
-                            host=host,
-                            check_type=svc_name,
-                            check_name=f"{svc_name.upper()} on port {svc_port}",
-                            interval=60,
-                            enabled=True,
-                            parameters={'port': svc_port}
-                        )
-                        service_checks_created += 1
-            
+            alerts_created += host_alerts
+            service_checks_created += host_services
             created_hosts.append(host)
             
         # Topology Linking
@@ -224,5 +348,37 @@ class DiscoveryViewSet(viewsets.ViewSet):
         return Response({
             'status': 'imported',
             'count': imported_count,
-            'service_checks_created': service_checks_created
+            'service_checks_created': service_checks_created,
+            'alerts_created': alerts_created,
         })
+
+
+class LanWatchView(views.APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request):
+        return Response(watch_status())
+
+    def patch(self, request):
+        is_admin = (
+            request.user.is_superuser
+            or getattr(request.user, 'role', None) == 'admin'
+            or getattr(request.user, 'is_admin', False)
+        )
+        if not is_admin:
+            return Response({'error': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
+
+        settings = LanWatchSettings.load()
+        if 'auto_add_hosts' in request.data:
+            settings.auto_add_hosts = bool(request.data.get('auto_add_hosts'))
+        if 'network' in request.data:
+            settings.network = (request.data.get('network') or '').strip()
+        settings.save()
+
+        added = sync_hosts_from_observations(
+            create_missing=settings.auto_add_hosts,
+            network=settings.network or None,
+        )
+        payload = watch_status()
+        payload['added'] = added
+        return Response(payload)

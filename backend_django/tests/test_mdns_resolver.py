@@ -121,5 +121,6 @@ class MdnsResolverTests(TestCase):
             },
             deep_probe=False,
         )
-        self.assertEqual(result.device_class, 'iot')
+        self.assertEqual(result.device_class, 'tv')
+        self.assertEqual(result.os_guess, 'Android')
         self.assertIn('Cast', result.identification_clues[0])

@@ -1,5 +1,7 @@
+.app-container,
 .App {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   background: var(--bg-primary);
@@ -9,24 +11,25 @@
   background: var(--bg-card);
   border-bottom: 1px solid var(--border-color);
   color: var(--text-primary);
-  padding: 0.75rem 0;
+  padding: 0.85rem 0;
   box-shadow: var(--shadow-md);
   backdrop-filter: blur(10px);
   position: sticky;
   top: 0;
   z-index: 100;
+  width: 100%;
 }
 
 .nav-container {
   width: 100%;
-  max-width: 1800px;
+  max-width: none;
   margin: 0 auto;
-  padding: 0 1.5rem;
+  padding: 0 var(--page-gutter);
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.75rem 1.75rem;
 }
 
 .nav-logo {
@@ -34,19 +37,24 @@
   color: var(--text-primary);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.7rem;
   flex-shrink: 0;
 }
 
 .nav-logo-text {
-  font-size: clamp(1rem, 2vw, 1.4rem);
+  font-size: 1.35rem;
   font-weight: 700;
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-primary);
   white-space: nowrap;
   margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.nav-logo svg {
+  color: var(--accent-primary);
+  width: 2.4rem;
+  height: 2.4rem;
+  flex-shrink: 0;
 }
 
 .nav-logo-img {
@@ -58,16 +66,18 @@
 
 .nav-menu {
   display: flex;
-  gap: clamp(0.5rem, 1.5vw, 1.5rem);
+  gap: clamp(0.75rem, 2vw, 2rem);
   align-items: center;
+  justify-content: center;
   flex-wrap: wrap;
+  flex: 1;
 }
 
 .nav-link {
   color: var(--text-secondary);
   text-decoration: none;
   font-weight: 500;
-  font-size: clamp(0.75rem, 1.2vw, 0.9rem);
+  font-size: 0.9rem;
   transition: all 0.2s ease;
   padding: 0.4rem 0;
   position: relative;
@@ -93,47 +103,100 @@
   width: 100%;
 }
 
+.nav-submenu {
+  position: relative;
+}
+
+.nav-submenu-trigger {
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 0.9rem;
+  padding: 0.4rem 0;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.nav-submenu-trigger:hover,
+.nav-submenu-trigger[aria-expanded="true"] {
+  color: var(--text-primary);
+}
+
+.nav-submenu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 8rem;
+  padding: 0.35rem 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  z-index: 110;
+}
+
+.nav-submenu-link {
+  display: block;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: clamp(0.75rem, 1.2vw, 0.9rem);
+  padding: 0.4rem 0.8rem;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.nav-submenu-link:hover {
+  color: var(--text-primary);
+  background: var(--bg-card);
+}
+
+.nav-menu:has(.nav-submenu-panel) {
+  overflow: visible;
+}
+
+.nav-end {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
 .nav-user {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-left: auto;
+  margin-left: 0;
 }
 
 .nav-username {
   color: var(--text-primary);
   font-weight: 500;
-  font-size: clamp(0.75rem, 1.2vw, 0.9rem);
+  font-size: 0.9rem;
 }
 
 .nav-badge {
-  background: var(--accent-gradient);
-  color: white;
+  background: var(--accent-primary);
+  color: var(--on-accent);
   padding: 0.25rem 0.5rem;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 0.65rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  letter-spacing: 0.06em;
 }
 
 .nav-logout {
   background: var(--bg-secondary);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
-  padding: 0.4rem 0.8rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  font-size: clamp(0.7rem, 1vw, 0.85rem);
 }
 
 .nav-logout:hover {
   background: var(--bg-tertiary);
   border-color: var(--border-hover);
-  transform: translateY(-1px);
 }
 
 /* Theme Toggle Switch */
@@ -161,9 +224,9 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--accent-gradient);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+  background: var(--accent-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
 }
 
 [data-theme='dark'] .theme-switch::after {
@@ -177,18 +240,11 @@
 .main-content {
   flex: 1;
   width: 100%;
-  max-width: 100%;
+  max-width: none;
   margin: 0 auto;
-  padding: clamp(0.75rem, 2vw, 2rem);
+  padding: 1.25rem var(--page-gutter);
   background: var(--bg-primary);
   overflow-x: hidden;
-}
-
-/* Large screens */
-@media (min-width: 1400px) {
-  .main-content {
-    max-width: 1800px;
-  }
 }
 
 /* Medium screens */
@@ -205,22 +261,18 @@
 /* Small screens */
 @media (max-width: 900px) {
   .nav-container {
-    padding: 0 1rem;
+    padding: 0 var(--page-gutter);
   }
 
   .nav-menu {
     order: 3;
     width: 100%;
-    justify-content: flex-start;
-    margin-top: 0.75rem;
+    justify-content: center;
+    margin-top: 0.25rem;
     padding-top: 0.75rem;
     border-top: 1px solid var(--border-color);
     overflow-x: auto;
     flex-wrap: nowrap;
-  }
-
-  .nav-user {
-    margin-left: auto;
   }
 
   .nav-username {
@@ -358,7 +410,9 @@
 }
 
 .nav-dropdown-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
   padding: 0.6rem 0.75rem;
   color: var(--text-secondary);
   text-decoration: none;
@@ -387,4 +441,24 @@
 
 .nav-dropdown-logout:hover {
   background: rgba(239, 68, 68, 0.1);
+}
+
+html[data-browser='safari'] .navbar {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-browser='safari'] .nav-container,
+html[data-browser='safari'] .nav-menu,
+html[data-browser='safari'] .nav-user {
+  flex-wrap: nowrap;
+}
+
+html[data-browser='safari'] .main-content {
+  padding: 1.15rem 1.35rem;
+  overflow-x: auto;
+}
+
+html[data-os='ios'] .main-content {
+  padding: 1rem;
 }

@@ -48,7 +48,7 @@ You can either:
 ```bash
 # Option A: Clone repository
 git clone <repository-url>
-cd "Nagios V2.0/agent"
+cd agent
 
 # Option B: Copy agent directory
 scp -r agent/ user@target-host:/opt/duck-monitoring-agent/
