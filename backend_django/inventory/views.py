@@ -141,6 +141,22 @@ class SNMPDeviceViewSet(viewsets.ModelViewSet):
         return Response({'status': 'Check queued'}, status=status.HTTP_202_ACCEPTED)
 
 STALE_OBSERVATION_DAYS = 14
+HOST_DOWN_CONDITION = {"field": "status", "operator": "equals", "value": "critical"}
+
+
+def _ensure_host_down_rule(host):
+    from alerts.models import AlertRule
+
+    if AlertRule.objects.filter(host=host, condition_type='host_down').exists():
+        return False
+    AlertRule.objects.create(
+        name=f"{host.hostname} down",
+        condition_type='host_down',
+        condition=HOST_DOWN_CONDITION,
+        severity='critical',
+        host=host,
+    )
+    return True
 
 
 class DiscoveryViewSet(viewsets.ViewSet):
@@ -199,9 +215,13 @@ class DiscoveryViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['post'])
     def import_hosts(self, request):
+        from alerts.pack import ensure_default_alert_pack
+
+        ensure_default_alert_pack()
         hosts_data = request.data.get('hosts', [])
         imported_count = 0
         service_checks_created = 0
+        alerts_created = 0
         
         # Detect Gateway for topology
         from .discovery import get_default_gateway
@@ -237,6 +257,8 @@ class DiscoveryViewSet(viewsets.ViewSet):
                     parameters={'count': 3}
                 )
                 imported_count += 1
+                if _ensure_host_down_rule(host):
+                    alerts_created += 1
             
             # Create service checks for selected services
             for service in host_data.get('services', []):
@@ -271,5 +293,6 @@ class DiscoveryViewSet(viewsets.ViewSet):
         return Response({
             'status': 'imported',
             'count': imported_count,
-            'service_checks_created': service_checks_created
+            'service_checks_created': service_checks_created,
+            'alerts_created': alerts_created,
         })

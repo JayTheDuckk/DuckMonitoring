@@ -115,10 +115,16 @@ class AlertService:
         host_rules = AlertRule.objects.filter(host=host, enabled=True)
         # Group rules
         group_rules = AlertRule.objects.filter(host_group=host.group, enabled=True) if host.group else []
-        
-        # Combine
-        rules = list(host_rules) + list(group_rules)
-        
+        # Global host-down fallback from the default alert pack
+        global_host_down = AlertRule.objects.filter(
+            host__isnull=True,
+            host_group__isnull=True,
+            condition_type='host_down',
+            enabled=True,
+        )
+
+        rules = list(host_rules) + list(group_rules) + list(global_host_down)
+
         for rule in rules:
             AlertService._evaluate_rule(rule, host, check_result)
 
@@ -133,7 +139,7 @@ class AlertService:
         field = condition.get('field')
         operator = condition.get('operator')
         target_value = condition.get('value')
-        
+
         # Get actual value from result
         actual_value = None
         if field == 'status':
@@ -141,25 +147,31 @@ class AlertService:
         elif field == 'response_time':
             actual_value = check_result.response_time
         # Add more fields as needed
-        
-        if actual_value is None:
-            return
-            
+
         is_triggered = False
-        
-        # Compare
-        if operator == 'equals' or operator == '==':
-             is_triggered = str(actual_value) == str(target_value)
-        elif operator == 'not_equals' or operator == '!=':
-             is_triggered = str(actual_value) != str(target_value)
-        elif operator == 'gt' or operator == '>':
-             try:
-                 is_triggered = float(actual_value) > float(target_value)
-             except: pass
-        elif operator == 'lt' or operator == '<':
-             try:
-                 is_triggered = float(actual_value) < float(target_value)
-             except: pass
+        if rule.condition_type == 'host_down':
+            is_triggered = getattr(check_result, 'status', None) == 'critical'
+            field = field or 'status'
+            operator = operator or 'equals'
+            target_value = target_value or 'critical'
+            actual_value = check_result.status
+        else:
+            if actual_value is None:
+                return
+
+            # Compare
+            if operator == 'equals' or operator == '==':
+                 is_triggered = str(actual_value) == str(target_value)
+            elif operator == 'not_equals' or operator == '!=':
+                 is_triggered = str(actual_value) != str(target_value)
+            elif operator == 'gt' or operator == '>':
+                 try:
+                     is_triggered = float(actual_value) > float(target_value)
+                 except: pass
+            elif operator == 'lt' or operator == '<':
+                 try:
+                     is_triggered = float(actual_value) < float(target_value)
+                 except: pass
              
         # Find existing active alert for this rule/host
         active_alert = Alert.objects.filter(
@@ -202,6 +214,34 @@ class AlertService:
                 AlertService._notify(active_alert, "Resolved")
 
     @staticmethod
+    def fire_inventory_event(rule, observation, title, message):
+        """
+        Create a firing Alert for a LAN inventory event.
+        Dedupes on the same IP + rule while an alert is still firing.
+        """
+        from inventory.models import Host
+
+        ip = observation.ip_address
+        host = Host.objects.filter(ip_address=ip).first()
+
+        existing = Alert.objects.filter(rule=rule, status='firing')
+        if host and existing.filter(host=host).exists():
+            return None
+        if existing.filter(message__contains=ip).exists():
+            return None
+
+        alert = Alert.objects.create(
+            rule=rule,
+            host=host,
+            title=title,
+            message=message,
+            severity=rule.severity,
+            status='firing',
+        )
+        AlertService._notify(alert, "Triggered")
+        return alert
+
+    @staticmethod
     def _notify(alert, action):
         """
         Sends notifications for the alert.
@@ -210,12 +250,13 @@ class AlertService:
         if not channels.exists():
             return
             
+        host_label = alert.host.hostname if alert.host else 'unknown'
         subject = f"[{alert.severity.upper()}] {action}: {alert.title}"
         message = f"""
         Alert: {alert.title}
         Status: {alert.status}
         Severity: {alert.severity}
-        Host: {alert.host.hostname}
+        Host: {host_label}
         Message: {alert.message}
         Triggered At: {alert.triggered_at}
         """
