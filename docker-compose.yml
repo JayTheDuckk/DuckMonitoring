@@ -1,91 +1,124 @@
-version: '3.8'
+name: duck-monitoring
+
+x-backend-env: &backend-env
+  SECRET_KEY: ${SECRET_KEY:-change-me-to-a-long-random-string}
+  DEBUG: ${DEBUG:-False}
+  DATABASE_URL: postgres://${POSTGRES_USER:-duck}:${POSTGRES_PASSWORD:-change-me}@db:5432/${POSTGRES_DB:-duck_monitoring}
+  DJANGO_SETTINGS_MODULE: config.settings
+  CELERY_BROKER_URL: redis://redis:6379/0
+  CELERY_RESULT_BACKEND: redis://redis:6379/0
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+  CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+  AGENT_API_TOKEN: ${AGENT_API_TOKEN:-}
 
 services:
   db:
-    image: postgres:15-alpine
+    container_name: duck-monitoring-db
+    image: postgres:18-alpine
     environment:
-      POSTGRES_DB: duck_monitoring
-      POSTGRES_USER: duck_db_user
-      POSTGRES_PASSWORD: duck_db_password
+      POSTGRES_DB: ${POSTGRES_DB:-duck_monitoring}
+      POSTGRES_USER: ${POSTGRES_USER:-duck}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U duck_db_user -d duck_monitoring" ]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-duck} -d ${POSTGRES_DB:-duck_monitoring}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+    restart: unless-stopped
 
   redis:
-    image: redis:7-alpine
+    container_name: duck-monitoring-redis
+    image: redis:8-alpine
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+    restart: unless-stopped
 
   backend:
+    container_name: duck-monitoring-api
     build:
       context: ./backend_django
       dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
     environment:
-      - DATABASE_URL=postgres://duck_db_user:duck_db_password@db:5432/duck_monitoring
-      - DJANGO_SETTINGS_MODULE=config.settings
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      <<: *backend-env
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
-      - ./.docker_data/backend_static:/app/static
-    command: >
-      sh -c "python manage.py migrate &&
-             python manage.py collectstatic --noinput &&
-             gunicorn --bind 0.0.0.0:8000 config.wsgi:application"
+      - backend_static:/app/static
+      - backend_data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 40s
+    restart: unless-stopped
 
   celery-worker:
+    container_name: duck-monitoring-worker
     build:
       context: ./backend_django
       dockerfile: Dockerfile
     environment:
-      - DATABASE_URL=postgres://duck_db_user:duck_db_password@db:5432/duck_monitoring
-      - DJANGO_SETTINGS_MODULE=config.settings
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      <<: *backend-env
+      RUN_MIGRATIONS: "0"
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - backend_data:/app/data
     command: celery -A config worker -l info
+    restart: unless-stopped
 
   celery-beat:
+    container_name: duck-monitoring-beat
     build:
       context: ./backend_django
       dockerfile: Dockerfile
     environment:
-      - DATABASE_URL=postgres://duck_db_user:duck_db_password@db:5432/duck_monitoring
-      - DJANGO_SETTINGS_MODULE=config.settings
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      <<: *backend-env
+      RUN_MIGRATIONS: "0"
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
     command: celery -A config beat -l info
+    restart: unless-stopped
 
   frontend:
+    container_name: duck-monitoring-ui
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
     ports:
-      - "3000:80"
+      - "${HTTP_PORT:-3000}:80"
+    volumes:
+      - backend_static:/backend_static:ro
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+    name: duck-monitoring-postgres
+  backend_static:
+    name: duck-monitoring-static
+  backend_data:
+    name: duck-monitoring-data
+
+networks:
+  default:
+    name: duck-monitoring

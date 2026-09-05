@@ -12,11 +12,7 @@ const AgentInstall = ({ serverUrl, onClose }) => {
     if (serverUrl) {
       return serverUrl.replace(/\/api\/?$/, '');
     }
-    // Fallback to current window location
-    const protocol = window.location.protocol;
-    const host = window.location.hostname;
-    const port = window.location.port === '3000' ? '8000' : window.location.port;
-    return `${protocol}//${host}${port ? ':' + port : ''}`;
+    return window.location.origin;
   };
 
   const baseUrl = getBaseUrl();
