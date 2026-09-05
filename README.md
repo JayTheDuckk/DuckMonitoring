@@ -15,9 +15,9 @@ A modern, hybrid network monitoring system with agent-based monitoring and histo
 
 ## Architecture
 
-- **Backend**: Django REST Framework (default port: 8000)
-- **Database**: SQLite (default) or PostgreSQL (optional)
-- **Frontend**: React with Chart.js for visualizations
+- **Backend**: Django 6 + Django REST Framework (default port: 8000)
+- **Database**: SQLite (local/dev) or PostgreSQL 18 (Docker)
+- **Frontend**: React 19 + Vite with Chart.js
 - **Agents**: Python-based monitoring agents using psutil
 
 ## Project Structure
@@ -52,7 +52,15 @@ A modern, hybrid network monitoring system with agent-based monitoring and histo
 
 ## Quick Start
 
-See [docs/QUICKSTART.md](docs/QUICKSTART.md) for a step-by-step guide to get running in minutes.
+**Recommended:** Docker Compose (Postgres, Redis, API, Celery, UI):
+
+```bash
+./scripts/docker-up.sh
+```
+
+Then open `http://localhost:3000` and create the first admin user.
+
+See [docs/DOCKER_QUICKSTART.md](docs/DOCKER_QUICKSTART.md) and [docs/QUICKSTART.md](docs/QUICKSTART.md).
 
 ### Using Docker Test Hosts
 
@@ -67,9 +75,9 @@ This will start 6 test hosts (web servers, database, cache, app servers) that au
 
 ## Getting Started
 
-### Start Everything
+### Start Everything (local/dev)
 
-One script handles setup, Redis, backend, Celery, and frontend:
+For host-network discovery on macOS, or working on the code without Docker:
 
 ```bash
 ./scripts/start.sh
@@ -92,6 +100,16 @@ To wipe the database and start fresh:
 Then open `http://localhost:3000` to register your first admin user.
 
 ## Server Management
+
+Docker (recommended):
+
+```bash
+./scripts/docker-up.sh
+./scripts/docker-down.sh
+docker compose logs -f
+```
+
+Local/dev:
 
 ```bash
 ./scripts/start.sh    # Start everything (idempotent)

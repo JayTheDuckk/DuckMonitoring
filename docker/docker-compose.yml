@@ -1,4 +1,4 @@
-version: '3.8'
+name: duck-monitoring-lab
 
 services:
   # Web Server 1
@@ -6,7 +6,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.agent
-    container_name: nagios-web-server-1
+    container_name: duck-lab-web-1
     environment:
       - SERVER_URL=http://host.docker.internal:8000
       - HOSTNAME=web-server-1
@@ -23,7 +23,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.agent
-    container_name: nagios-web-server-2
+    container_name: duck-lab-web-2
     environment:
       - SERVER_URL=http://host.docker.internal:8000
       - HOSTNAME=web-server-2
@@ -40,7 +40,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.agent
-    container_name: nagios-db-server
+    container_name: duck-lab-db
     environment:
       - SERVER_URL=http://host.docker.internal:8000
       - HOSTNAME=db-server
@@ -57,7 +57,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.agent
-    container_name: nagios-cache-server
+    container_name: duck-lab-cache
     environment:
       - SERVER_URL=http://host.docker.internal:8000
       - HOSTNAME=cache-server
@@ -74,7 +74,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.agent
-    container_name: nagios-app-server-1
+    container_name: duck-lab-app-1
     environment:
       - SERVER_URL=http://host.docker.internal:8000
       - HOSTNAME=app-server-1
@@ -91,7 +91,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.agent
-    container_name: nagios-app-server-2
+    container_name: duck-lab-app-2
     environment:
       - SERVER_URL=http://host.docker.internal:8000
       - HOSTNAME=app-server-2

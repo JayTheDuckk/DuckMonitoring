@@ -64,17 +64,12 @@ if [ -f /tmp/duck-monitoring-frontend.pid ]; then
     rm -f /tmp/duck-monitoring-frontend.pid
 else
     # Try to kill by process name if PID file doesn't exist
-    if pgrep -f "react-scripts start" > /dev/null; then
-        pkill -f "react-scripts start"
+    if pgrep -f "vite" > /dev/null; then
+        pkill -f "vite"
         echo -e "${GREEN}Frontend stopped${NC}"
     else
         echo -e "${YELLOW}Frontend was not running${NC}"
     fi
-fi
-
-# Also kill any node processes that might be related (more aggressive cleanup)
-if pgrep -f "node.*react-scripts" > /dev/null; then
-    pkill -f "node.*react-scripts" 2>/dev/null || true
 fi
 
 # Stop Redis only if this script started it (not Homebrew/system-managed)

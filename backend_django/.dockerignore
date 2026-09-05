@@ -1,0 +1,11 @@
+venv
+.venv
+__pycache__
+*.pyc
+*.pyo
+logs
+data/mac_vendors.txt
+data/mac_research_cache.json
+*.sqlite3
+.pytest_cache
+.mypy_cache

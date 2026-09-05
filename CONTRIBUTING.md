@@ -22,7 +22,7 @@ If you've noticed a bug or have a feature request, make sure to check our Issues
     ```bash
     cd frontend
     npm install
-    npm start
+    npm start   # Vite dev server on port 3000
     ```
 
 ## Submitting a Pull Request

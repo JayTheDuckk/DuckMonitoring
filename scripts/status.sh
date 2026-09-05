@@ -50,8 +50,8 @@ fi
 echo ""
 
 # Check frontend
-if pgrep -f "react-scripts start" > /dev/null; then
-    FRONTEND_PID=$(pgrep -f "react-scripts start" | head -n 1)
+if pgrep -f "vite" > /dev/null; then
+    FRONTEND_PID=$(pgrep -f "vite" | head -n 1)
     echo -e "${GREEN}✓ Frontend: Running (PID: $FRONTEND_PID)${NC}"
     echo "  URL: http://localhost:3000"
     if [ -f /tmp/duck-monitoring-frontend.log ]; then
