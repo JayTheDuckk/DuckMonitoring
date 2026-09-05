@@ -291,6 +291,38 @@ const HostDetail = () => {
             <span className="info-value">{host.vendor}</span>
           </div>
         )}
+        {host.device_class && (
+          <div className="info-item">
+            <span className="info-label">Device Class:</span>
+            <span className="info-value">{host.device_class}</span>
+          </div>
+        )}
+        {host.mdns_name && (
+          <div className="info-item">
+            <span className="info-label">mDNS Name:</span>
+            <span className="info-value">{host.mdns_name}</span>
+          </div>
+        )}
+        {host.apple_model && (
+          <div className="info-item">
+            <span className="info-label">Apple Model:</span>
+            <span className="info-value">{host.apple_model}</span>
+          </div>
+        )}
+        {host.confidence != null && host.confidence !== '' && (
+          <div className="info-item">
+            <span className="info-label">Confidence:</span>
+            <span className="info-value">{host.confidence}</span>
+          </div>
+        )}
+        {host.last_seen && (
+          <div className="info-item">
+            <span className="info-label">Last Seen:</span>
+            <span className="info-value">
+              {new Date(host.last_seen).toLocaleString()}
+            </span>
+          </div>
+        )}
         {host.last_check && (
           <div className="info-item">
             <span className="info-label">Last Check:</span>

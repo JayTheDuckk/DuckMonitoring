@@ -46,6 +46,21 @@ const getVendorDisplay = (host) => {
     };
 };
 
+const formatLastSeen = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const deltaMs = Date.now() - date.getTime();
+    const minutes = Math.floor(deltaMs / 60000);
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleString();
+};
+
 const RadarIcon = () => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
@@ -99,6 +114,18 @@ const HostDiscovery = () => {
     const [searchFilter, setSearchFilter] = useState('');
     const [scanElapsed, setScanElapsed] = useState(0);
     const timerRef = useRef(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        api.get('/inventory/discovery/history/')
+            .then((response) => {
+                if (!cancelled && response.data?.hosts?.length) {
+                    setResults((prev) => prev || response.data);
+                }
+            })
+            .catch(() => {});
+        return () => { cancelled = true; };
+    }, []);
 
     // Scan timer
     useEffect(() => {
@@ -424,7 +451,7 @@ const HostDiscovery = () => {
                                     {filteredHosts.map(host => (
                                         <React.Fragment key={host.ip_address}>
                                             <tr
-                                                className={`host-table-row ${selectedHosts.has(host.ip_address) ? 'selected' : ''}`}
+                                                className={`host-table-row ${selectedHosts.has(host.ip_address) ? 'selected' : ''} ${host.seen_this_scan === false ? 'not-in-scan' : ''}`}
                                                 onClick={() => host.services?.length > 0 && toggleHostExpanded(host.ip_address)}
                                             >
                                                 <td onClick={(e) => e.stopPropagation()}>
@@ -434,7 +461,12 @@ const HostDiscovery = () => {
                                                         onChange={() => toggleHostSelection(host.ip_address)}
                                                     />
                                                 </td>
-                                                <td><span className="host-status-dot"></span></td>
+                                                <td>
+                                                    <span className="host-status-dot"></span>
+                                                    {host.seen_this_scan === false && (
+                                                        <span className="not-in-scan-badge">Not in this scan</span>
+                                                    )}
+                                                </td>
                                                 <td className="host-ip-cell">{host.ip_address}</td>
                                                 <td className="host-mac-cell">{host.mac_address || '—'}</td>
                                                 <td className="host-vendor-cell">
@@ -462,6 +494,11 @@ const HostDiscovery = () => {
                                                         </>
                                                     ) : (
                                                         host.hostname || '—'
+                                                    )}
+                                                    {host.last_seen && (
+                                                        <span className="last-seen-label">
+                                                            Last seen {formatLastSeen(host.last_seen)}
+                                                        </span>
                                                     )}
                                                 </td>
                                                 <td className="host-latency-cell">
