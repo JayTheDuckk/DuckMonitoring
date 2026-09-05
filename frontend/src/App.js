@@ -26,6 +26,8 @@ import './App.css';
 const Navbar = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [hardwareOpen, setHardwareOpen] = React.useState(false);
+  const hardwareRef = React.useRef(null);
 
   // Theme state
   const [theme, setTheme] = React.useState(() => {
@@ -37,16 +39,41 @@ const Navbar = () => {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  React.useEffect(() => {
+    if (!hardwareOpen) return;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setHardwareOpen(false);
+      }
+    };
+
+    const handlePointerDown = (event) => {
+      if (hardwareRef.current && !hardwareRef.current.contains(event.target)) {
+        setHardwareOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handlePointerDown);
+    };
+  }, [hardwareOpen]);
+
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
   const handleLogout = async () => {
     setMenuOpen(false);
+    setHardwareOpen(false);
     await logout();
   };
 
   const closeMenu = () => setMenuOpen(false);
+  const closeHardware = () => setHardwareOpen(false);
 
   if (!isAuthenticated) {
     return null;
@@ -64,8 +91,28 @@ const Navbar = () => {
         {/* Main Navigation - Essential Items */}
         <div className="nav-menu">
           <Link to="/" className="nav-link">Dashboard</Link>
-          <Link to="/ups" className="nav-link">UPS</Link>
-          <Link to="/snmp" className="nav-link">SNMP</Link>
+          <Link to="/discovery" className="nav-link">Discovery</Link>
+          <div className="nav-submenu" ref={hardwareRef}>
+            <button
+              type="button"
+              className="nav-submenu-trigger"
+              aria-expanded={hardwareOpen}
+              aria-haspopup="true"
+              onClick={() => setHardwareOpen((open) => !open)}
+            >
+              Hardware
+            </button>
+            {hardwareOpen && (
+              <div className="nav-submenu-panel" role="menu">
+                <Link to="/ups" className="nav-submenu-link" role="menuitem" onClick={closeHardware}>
+                  UPS
+                </Link>
+                <Link to="/snmp" className="nav-submenu-link" role="menuitem" onClick={closeHardware}>
+                  SNMP
+                </Link>
+              </div>
+            )}
+          </div>
           <Link to="/topology" className="nav-link">Topology</Link>
           <Link to="/alerts" className="nav-link">Alerts</Link>
         </div>
@@ -133,9 +180,6 @@ const Navbar = () => {
                 {isAdmin && (
                   <div className="nav-dropdown-section">
                     <div className="nav-dropdown-label">Administration</div>
-                    <Link to="/discovery" className="nav-dropdown-link" onClick={closeMenu}>
-                      🔍 Network Discovery
-                    </Link>
                     <Link to="/users" className="nav-dropdown-link" onClick={closeMenu}>
                       👥 User Management
                     </Link>
